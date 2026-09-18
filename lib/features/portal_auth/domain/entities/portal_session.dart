@@ -9,12 +9,9 @@ class PortalSession {
   final String role;
   final List<String> grantedLinkKeys;
 
-  static const installerAdminEmail = 'vetrivel23072003@gmail.com';
-
   bool get isAdmin =>
       role.trim().toLowerCase() == 'admin' ||
-      username.trim().toLowerCase() == 'admin' ||
-      email.trim().toLowerCase() == installerAdminEmail;
+      username.trim().toLowerCase() == 'admin';
 
   const PortalSession({
     this.userId,

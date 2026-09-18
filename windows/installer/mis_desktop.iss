@@ -5,7 +5,7 @@
 ; See README.md in this folder for the full process.
 
 #define MyAppName "ARMSS Gateway"
-#define MyAppVersion "1.1.2"
+#define MyAppVersion "1.1.4"
 #define MyAppExeName "armss_gateway.exe"
 #define MyReleaseDir "..\..\build\windows\x64\runner\Release"
 #define VCRedistInstaller "prerequisites\vc_redist.x64.exe"
