@@ -50,6 +50,8 @@ abstract class PortalAdminRepository {
   Future<Result<List<AdminAuditLog>>> listAuditLogs({int limit = 100});
   Future<Result<String>> getInstallerPassword();
   Future<Result<void>> setInstallerPassword(String newPassword);
+  Future<Result<String>> getInstallerAdminEmail();
+  Future<Result<void>> setInstallerAdminEmail(String newEmail);
   Future<Result<String>> getAdminPassword();
   Future<Result<void>> setAdminPassword(String newPassword);
   Future<Result<bool>> getTokenRestrictionEnabled();

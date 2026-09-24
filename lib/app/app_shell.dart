@@ -19,6 +19,7 @@ import '../features/device_activation/presentation/controllers/device_access_con
 import '../features/device_activation/presentation/widgets/device_revocation_banner.dart';
 import '../core/portal_links/portal_link_catalog_repository.dart';
 import '../shared_widgets/app_nav_rail.dart';
+import '../shared_widgets/app_footer.dart';
 import '../shared_widgets/change_password_dialog.dart';
 import '../shared_widgets/page_header.dart';
 import '../features/profile/presentation/screens/user_profile_screen.dart';
@@ -169,6 +170,7 @@ class _AppShellState extends ConsumerState<AppShell> {
                   ],
                 ),
               ),
+              const AppFooter(),
             ],
           ),
         ),

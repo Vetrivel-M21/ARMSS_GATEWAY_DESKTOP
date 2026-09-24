@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../../core/device_auth/device_account_binding_service.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../../../core/updates/app_update_service.dart';
 import '../../../portal_auth/presentation/controllers/portal_auth_controllers.dart';
@@ -25,6 +26,26 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
   bool _obscurePassword = true;
   bool _isSubmitting = false;
   String? _errorMessage;
+  BoundAccount? _boundAccount;
+
+  @override
+  void initState() {
+    super.initState();
+    _checkBoundAccount();
+  }
+
+  Future<void> _checkBoundAccount() async {
+    final bindingService = ref.read(deviceAccountBindingServiceProvider);
+    final bound = await bindingService.getBoundAccount();
+    if (mounted && bound != null) {
+      setState(() {
+        _boundAccount = bound;
+        if (_usernameController.text.trim().isEmpty) {
+          _usernameController.text = bound.displayName;
+        }
+      });
+    }
+  }
 
   @override
   void dispose() {
@@ -42,6 +63,20 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
 
     final identifier = _usernameController.text.trim();
     final password = _passwordController.text;
+
+    // Check device binding
+    final bindingService = ref.read(deviceAccountBindingServiceProvider);
+    final isAllowed = await bindingService.isIdentifierAllowed(identifier);
+    if (!isAllowed) {
+      final bound = await bindingService.getBoundAccount();
+      final name = bound?.displayName ?? 'another account';
+      setState(() {
+        _isSubmitting = false;
+        _errorMessage =
+            'This device is permanently registered to "$name". Other accounts (including Admin) cannot log in. Reinstall the application to switch accounts.';
+      });
+      return;
+    }
 
     final portalResult = await ref
         .read(portalSessionControllerProvider.notifier)
@@ -79,6 +114,60 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                         crossAxisAlignment: CrossAxisAlignment.stretch,
                         children: [
                           Image.asset('assets/images/login_logo.png', height: 100),
+                        if (_boundAccount != null) ...[
+                          const SizedBox(height: 16),
+                          Container(
+                            padding: const EdgeInsets.all(12),
+                            decoration: BoxDecoration(
+                              color: Theme.of(context).colorScheme.primary.withValues(alpha: 0.08),
+                              borderRadius: BorderRadius.circular(10),
+                              border: Border.all(
+                                color: Theme.of(context).colorScheme.primary.withValues(alpha: 0.25),
+                              ),
+                            ),
+                            child: Row(
+                              children: [
+                                Icon(
+                                  Icons.lock_person_rounded,
+                                  color: Theme.of(context).colorScheme.primary,
+                                  size: 20,
+                                ),
+                                const SizedBox(width: 10),
+                                Expanded(
+                                  child: Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      Text(
+                                        'Device Locked to Account',
+                                        style: TextStyle(
+                                          fontSize: 11,
+                                          fontWeight: FontWeight.w700,
+                                          color: Theme.of(context).colorScheme.primary,
+                                        ),
+                                      ),
+                                      const SizedBox(height: 2),
+                                      Text(
+                                        _boundAccount!.displayName,
+                                        style: const TextStyle(
+                                          fontSize: 13,
+                                          fontWeight: FontWeight.w600,
+                                        ),
+                                      ),
+                                      const SizedBox(height: 2),
+                                      Text(
+                                        'Other accounts cannot log in. Reinstall app to change.',
+                                        style: TextStyle(
+                                          fontSize: 10,
+                                          color: Theme.of(context).textTheme.bodySmall?.color?.withValues(alpha: 0.75),
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
                         const SizedBox(height: 24),
                         TextFormField(
                           controller: _usernameController,
@@ -116,11 +205,12 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                           alignment: WrapAlignment.spaceBetween,
                           crossAxisAlignment: WrapCrossAlignment.center,
                           children: [
-                            TextButton(
-                              onPressed: () => Navigator.of(context)
-                                  .push(MaterialPageRoute(builder: (_) => const PortalRegisterScreen())),
-                              child: const Text('Register'),
-                            ),
+                            if (_boundAccount == null)
+                              TextButton(
+                                onPressed: () => Navigator.of(context)
+                                    .push(MaterialPageRoute(builder: (_) => const PortalRegisterScreen())),
+                                child: const Text('Register'),
+                              ),
                             TextButton(
                               onPressed: () => Navigator.of(context)
                                   .push(MaterialPageRoute(builder: (_) => const PortalForgotPasswordScreen())),

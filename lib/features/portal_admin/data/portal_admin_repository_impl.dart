@@ -657,6 +657,80 @@ class PortalAdminRepositoryImpl implements PortalAdminRepository {
   }
 
   @override
+  Future<Result<String>> getInstallerAdminEmail() async {
+    try {
+      final response = await http
+          .get(_uri('/portal/admin/installer-email'), headers: _headers)
+          .timeout(const Duration(seconds: 10));
+      if (response.statusCode == 404) {
+        return const Failure(
+          NetworkException(
+            'Installer email endpoint not found (404). Please deploy the updated backend on the server.',
+          ),
+        );
+      }
+      if (response.statusCode != 200) {
+        return Failure(
+          NetworkException('Server returned HTTP ${response.statusCode}.'),
+        );
+      }
+      final body = jsonDecode(response.body) as Map<String, dynamic>;
+      if (body['success'] != true) {
+        return const Failure(
+          NetworkException('Unable to load installer admin email.'),
+        );
+      }
+      final data = body['data'] as Map<String, dynamic>?;
+      final email = data?['email'] as String? ?? '';
+      return Success(email);
+    } catch (e) {
+      return Failure(
+        NetworkException('Failed to load installer admin email: $e'),
+      );
+    }
+  }
+
+  @override
+  Future<Result<void>> setInstallerAdminEmail(String newEmail) async {
+    try {
+      final response = await http
+          .post(
+            _uri('/portal/admin/installer-email'),
+            headers: _headers,
+            body: jsonEncode({'email': newEmail}),
+          )
+          .timeout(const Duration(seconds: 10));
+      if (response.statusCode == 404) {
+        return const Failure(
+          NetworkException(
+            'Installer email endpoint not found (404). Please deploy the updated backend on the server.',
+          ),
+        );
+      }
+      if (response.statusCode != 200) {
+        return Failure(
+          NetworkException('Server returned HTTP ${response.statusCode}.'),
+        );
+      }
+      final body = jsonDecode(response.body) as Map<String, dynamic>;
+      if (body['success'] != true) {
+        final err = body['error'] as Map<String, dynamic>?;
+        return Failure(
+          NetworkException(
+            err?['message'] as String? ??
+                'Unable to update installer admin email.',
+          ),
+        );
+      }
+      return const Success(null);
+    } catch (e) {
+      return Failure(
+        NetworkException('Failed to update installer admin email: $e'),
+      );
+    }
+  }
+
+  @override
   Future<Result<String>> getAdminPassword() async {
     try {
       final response = await http

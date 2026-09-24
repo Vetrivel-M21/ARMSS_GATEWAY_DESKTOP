@@ -5,7 +5,7 @@
 ; See README.md in this folder for the full process.
 
 #define MyAppName "ARMSS Gateway"
-#define MyAppVersion "1.1.4"
+#define MyAppVersion "1.1.7"
 #define MyAppExeName "armss_gateway.exe"
 #define MyReleaseDir "..\..\build\windows\x64\runner\Release"
 #define VCRedistInstaller "prerequisites\vc_redist.x64.exe"
@@ -55,6 +55,11 @@ Name: "{userdesktop}\{#MyAppName}"; Filename: "{app}\{#MyAppExeName}"; Tasks: de
 [Run]
 Filename: "{tmp}\vc_redist.x64.exe"; Parameters: "/install /quiet /norestart"; StatusMsg: "Installing Microsoft Visual C++ Runtime..."; Verb: runas; Flags: waituntilterminated shellexec; Check: NeedVCRedist
 Filename: "{app}\{#MyAppExeName}"; Description: "{cm:LaunchProgram,{#MyAppName}}"; Flags: nowait postinstall skipifsilent
+
+[UninstallDelete]
+Type: filesandordirs; Name: "{localappdata}\ARMSS Gateway"
+Type: filesandordirs; Name: "{localappdata}\Programs\ARMSS Gateway"
+Type: filesandordirs; Name: "{app}"
 
 [Code]
 var

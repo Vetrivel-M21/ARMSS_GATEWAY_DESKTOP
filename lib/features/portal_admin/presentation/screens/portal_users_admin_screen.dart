@@ -56,6 +56,12 @@ class _PortalUsersAdminScreenState extends ConsumerState<PortalUsersAdminScreen>
   bool _loadingAuditLogs = false;
   int? _selectedAuditUserId;
 
+  // ── Search state ────────────────────────────────────────────────────────────
+  final TextEditingController _userSearchCtrl = TextEditingController();
+  final TextEditingController _deviceSearchCtrl = TextEditingController();
+  String _userQuery = '';
+  String _deviceQuery = '';
+
   @override
   void initState() {
     super.initState();
@@ -77,6 +83,8 @@ class _PortalUsersAdminScreenState extends ConsumerState<PortalUsersAdminScreen>
   @override
   void dispose() {
     _tabController.dispose();
+    _userSearchCtrl.dispose();
+    _deviceSearchCtrl.dispose();
     super.dispose();
   }
 
@@ -820,148 +828,203 @@ class _PortalUsersAdminScreenState extends ConsumerState<PortalUsersAdminScreen>
       return const Center(child: Text('No portal users have registered yet.'));
     }
 
-    return ListView.separated(
-      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
-      itemCount: users.length,
-      separatorBuilder: (_, _) => const Divider(height: 1),
-      itemBuilder: (context, index) {
-        final user = users[index];
-        final isAdmin = user.isAdmin;
-        return ListTile(
-          title: Row(
-            children: [
-              Text(
-                user.fullName,
-                style: const TextStyle(fontWeight: FontWeight.w600),
+    // ── Filter by search query ───────────────────────────────────────────────
+    final q = _userQuery.trim().toLowerCase();
+    final filtered = q.isEmpty
+        ? users
+        : users.where((u) {
+            return u.fullName.toLowerCase().contains(q) ||
+                u.username.toLowerCase().contains(q) ||
+                u.email.toLowerCase().contains(q) ||
+                u.department.toLowerCase().contains(q) ||
+                u.branch.toLowerCase().contains(q);
+          }).toList();
+
+    return Column(
+      children: [
+        // ── Search bar ────────────────────────────────────────────────────────
+        Padding(
+          padding: const EdgeInsets.fromLTRB(20, 14, 20, 8),
+          child: TextField(
+            controller: _userSearchCtrl,
+            onChanged: (v) => setState(() => _userQuery = v),
+            decoration: InputDecoration(
+              hintText: 'Search users by name, username, email, department or branch…',
+              prefixIcon: const Icon(Icons.search, size: 20),
+              suffixIcon: _userQuery.isNotEmpty
+                  ? IconButton(
+                      icon: const Icon(Icons.close, size: 18),
+                      tooltip: 'Clear search',
+                      onPressed: () {
+                        _userSearchCtrl.clear();
+                        setState(() => _userQuery = '');
+                      },
+                    )
+                  : null,
+              isDense: true,
+              contentPadding: const EdgeInsets.symmetric(vertical: 10, horizontal: 14),
+              border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
+              filled: true,
+              fillColor: AppColors.surfacePanel,
+            ),
+          ),
+        ),
+        if (filtered.isEmpty)
+          Expanded(
+            child: Center(
+              child: Text(
+                q.isEmpty ? 'No portal users found.' : 'No users match "$q".',
+                style: const TextStyle(color: AppColors.inkSecondary),
               ),
-              const SizedBox(width: 8),
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                decoration: BoxDecoration(
-                  color: isAdmin
-                      ? AppColors.accentLedger.withValues(alpha: 0.12)
-                      : Colors.grey.withValues(alpha: 0.12),
-                  borderRadius: BorderRadius.circular(12),
-                  border: Border.all(
-                    color: isAdmin
-                        ? AppColors.accentLedger.withValues(alpha: 0.4)
-                        : Colors.grey.withValues(alpha: 0.4),
-                    width: 1,
-                  ),
-                ),
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Icon(
-                      isAdmin
-                          ? Icons.admin_panel_settings_rounded
-                          : Icons.person_rounded,
-                      size: 13,
-                      color: isAdmin ? AppColors.accentLedger : Colors.grey[700],
-                    ),
-                    const SizedBox(width: 4),
-                    Text(
-                      isAdmin ? 'ADMIN' : 'USER',
-                      style: TextStyle(
-                        fontSize: 11,
-                        fontWeight: FontWeight.bold,
-                        color: isAdmin ? AppColors.accentLedger : Colors.grey[700],
+            ),
+          )
+        else
+          Expanded(
+            child: ListView.separated(
+              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
+              itemCount: filtered.length,
+              separatorBuilder: (_, __) => const Divider(height: 1),
+              itemBuilder: (context, index) {
+                final user = filtered[index];
+                final isAdmin = user.isAdmin;
+                return ListTile(
+                  title: Row(
+                    children: [
+                      Text(
+                        user.fullName,
+                        style: const TextStyle(fontWeight: FontWeight.w600),
                       ),
-                    ),
-                  ],
-                ),
-              ),
-            ],
-          ),
-          subtitle: Text(
-            '${user.username} · ${user.email} · ${user.department} · ${user.branch}',
-          ),
-          trailing: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Text(
-                user.isActive ? 'Approved' : 'Pending',
-                style: TextStyle(
-                  color: user.isActive
-                      ? AppColors.signalCredit
-                      : AppColors.signalAmber,
-                ),
-              ),
-              Switch(
-                value: user.isActive,
-                onChanged: (v) => _setActive(user, v),
-              ),
-              const SizedBox(width: 8),
-              Text('${user.grantedLinkKeys.length} granted'),
-              PopupMenuButton<String>(
-                onSelected: (action) {
-                  if (action == 'view_password') _viewPassword(user);
-                  if (action == 'change_password') _changePassword(user);
-                  if (action == 'change_role') _changeRole(user);
-                  if (action == 'delete_user') _deleteUser(user);
-                },
-                itemBuilder: (context) => [
-                  const PopupMenuItem(
-                    value: 'view_password',
-                    child: Text('View Password'),
-                  ),
-                  const PopupMenuItem(
-                    value: 'change_password',
-                    child: Text('Change Password'),
-                  ),
-                  PopupMenuItem(
-                    value: 'change_role',
-                    child: Row(
-                      children: [
-                        Icon(
-                          isAdmin
-                              ? Icons.person_outline
-                              : Icons.admin_panel_settings_outlined,
-                          size: 18,
+                      const SizedBox(width: 8),
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                        decoration: BoxDecoration(
+                          color: isAdmin
+                              ? AppColors.accentLedger.withValues(alpha: 0.12)
+                              : Colors.grey.withValues(alpha: 0.12),
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(
+                            color: isAdmin
+                                ? AppColors.accentLedger.withValues(alpha: 0.4)
+                                : Colors.grey.withValues(alpha: 0.4),
+                            width: 1,
+                          ),
                         ),
-                        const SizedBox(width: 8),
-                        Text(
-                          isAdmin
-                              ? 'Demote to User'
-                              : 'Promote to Admin',
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(
+                              isAdmin
+                                  ? Icons.admin_panel_settings_rounded
+                                  : Icons.person_rounded,
+                              size: 13,
+                              color: isAdmin ? AppColors.accentLedger : Colors.grey[700],
+                            ),
+                            const SizedBox(width: 4),
+                            Text(
+                              isAdmin ? 'ADMIN' : 'USER',
+                              style: TextStyle(
+                                fontSize: 11,
+                                fontWeight: FontWeight.bold,
+                                color: isAdmin ? AppColors.accentLedger : Colors.grey[700],
+                              ),
+                            ),
+                          ],
                         ),
-                      ],
-                    ),
+                      ),
+                    ],
                   ),
-                  const PopupMenuDivider(),
-                  const PopupMenuItem(
-                    value: 'delete_user',
-                    child: Row(
-                      children: [
-                        Icon(
+                  subtitle: Text(
+                    '${user.username} · ${user.email} · ${user.department} · ${user.branch}',
+                  ),
+                  trailing: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text(
+                        user.isActive ? 'Approved' : 'Pending',
+                        style: TextStyle(
+                          color: user.isActive
+                              ? AppColors.signalCredit
+                              : AppColors.signalAmber,
+                        ),
+                      ),
+                      Switch(
+                        value: user.isActive,
+                        onChanged: (v) => _setActive(user, v),
+                      ),
+                      const SizedBox(width: 8),
+                      Text('${user.grantedLinkKeys.length} granted'),
+                      PopupMenuButton<String>(
+                        onSelected: (action) {
+                          if (action == 'view_password') _viewPassword(user);
+                          if (action == 'change_password') _changePassword(user);
+                          if (action == 'change_role') _changeRole(user);
+                          if (action == 'delete_user') _deleteUser(user);
+                        },
+                        itemBuilder: (context) => [
+                          const PopupMenuItem(
+                            value: 'view_password',
+                            child: Text('View Password'),
+                          ),
+                          const PopupMenuItem(
+                            value: 'change_password',
+                            child: Text('Change Password'),
+                          ),
+                          PopupMenuItem(
+                            value: 'change_role',
+                            child: Row(
+                              children: [
+                                Icon(
+                                  isAdmin
+                                      ? Icons.person_outline
+                                      : Icons.admin_panel_settings_outlined,
+                                  size: 18,
+                                ),
+                                const SizedBox(width: 8),
+                                Text(
+                                  isAdmin
+                                      ? 'Demote to User'
+                                      : 'Promote to Admin',
+                                ),
+                              ],
+                            ),
+                          ),
+                          const PopupMenuDivider(),
+                          const PopupMenuItem(
+                            value: 'delete_user',
+                            child: Row(
+                              children: [
+                                Icon(
+                                  Icons.delete_outline,
+                                  size: 18,
+                                  color: AppColors.signalError,
+                                ),
+                                SizedBox(width: 8),
+                                Text(
+                                  'Delete User',
+                                  style: TextStyle(color: AppColors.signalError),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
+                      ),
+                      IconButton(
+                        icon: const Icon(
                           Icons.delete_outline,
-                          size: 18,
                           color: AppColors.signalError,
+                          size: 20,
                         ),
-                        SizedBox(width: 8),
-                        Text(
-                          'Delete User',
-                          style: TextStyle(color: AppColors.signalError),
-                        ),
-                      ],
-                    ),
+                        tooltip: 'Delete User',
+                        onPressed: () => _deleteUser(user),
+                      ),
+                    ],
                   ),
-                ],
-              ),
-              IconButton(
-                icon: const Icon(
-                  Icons.delete_outline,
-                  color: AppColors.signalError,
-                  size: 20,
-                ),
-                tooltip: 'Delete User',
-                onPressed: () => _deleteUser(user),
-              ),
-            ],
+                  onTap: () => _editGrants(user),
+                );
+              },
+            ),
           ),
-          onTap: () => _editGrants(user),
-        );
-      },
+      ],
     );
   }
 
@@ -986,7 +1049,7 @@ class _PortalUsersAdminScreenState extends ConsumerState<PortalUsersAdminScreen>
           child: ListView.separated(
             padding: const EdgeInsets.all(20),
             itemCount: links.length,
-            separatorBuilder: (_, _) => const Divider(height: 1),
+            separatorBuilder: (_, __) => const Divider(height: 1),
             itemBuilder: (_, index) {
               final link = links[index];
               return ListTile(
@@ -1022,9 +1085,52 @@ class _PortalUsersAdminScreenState extends ConsumerState<PortalUsersAdminScreen>
         .valueOrNull;
     final dateFormat = DateFormat('yyyy-MM-dd HH:mm');
 
-    return ListView(
-      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+    // ── Filter devices by search query ───────────────────────────────────────
+    final dq = _deviceQuery.trim().toLowerCase();
+    final filteredDevices = dq.isEmpty
+        ? devices
+        : devices.where((d) {
+            final name = (d.fullName.isNotEmpty ? d.fullName : d.username).toLowerCase();
+            return name.contains(dq) ||
+                d.username.toLowerCase().contains(dq) ||
+                d.email.toLowerCase().contains(dq) ||
+                d.deviceId.toLowerCase().contains(dq) ||
+                d.machineFingerprint.toLowerCase().contains(dq);
+          }).toList();
+
+    return Column(
       children: [
+        // ── Search bar ─────────────────────────────────────────────────────
+        Padding(
+          padding: const EdgeInsets.fromLTRB(20, 14, 20, 4),
+          child: TextField(
+            controller: _deviceSearchCtrl,
+            onChanged: (v) => setState(() => _deviceQuery = v),
+            decoration: InputDecoration(
+              hintText: 'Search devices by user name, username, email or device ID…',
+              prefixIcon: const Icon(Icons.search, size: 20),
+              suffixIcon: _deviceQuery.isNotEmpty
+                  ? IconButton(
+                      icon: const Icon(Icons.close, size: 18),
+                      tooltip: 'Clear search',
+                      onPressed: () {
+                        _deviceSearchCtrl.clear();
+                        setState(() => _deviceQuery = '');
+                      },
+                    )
+                  : null,
+              isDense: true,
+              contentPadding: const EdgeInsets.symmetric(vertical: 10, horizontal: 14),
+              border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
+              filled: true,
+              fillColor: AppColors.surfacePanel,
+            ),
+          ),
+        ),
+        Expanded(
+          child: ListView(
+            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+            children: [
         if (currentSession != null) ...[
           Container(
             padding: const EdgeInsets.all(12),
@@ -1091,7 +1197,7 @@ class _PortalUsersAdminScreenState extends ConsumerState<PortalUsersAdminScreen>
             ),
           )
         else
-          ...devices.map((device) {
+          ...filteredDevices.map((device) {
             final isActive = device.tokenStatus == 'active';
             final displayName = device.fullName.isNotEmpty
                 ? device.fullName
@@ -1298,6 +1404,9 @@ class _PortalUsersAdminScreenState extends ConsumerState<PortalUsersAdminScreen>
               ),
             );
           }),
+            ],
+          ),
+        ),
       ],
     );
   }
@@ -1893,6 +2002,7 @@ class _InstallerPasswordDialogState
     extends ConsumerState<_InstallerPasswordDialog> {
   final _newPasswordController = TextEditingController();
   final _confirmPasswordController = TextEditingController();
+  final _emailController = TextEditingController();
   bool _isLoadingCurrent = true;
   String? _currentPassword;
   String? _loadError;
@@ -1903,18 +2013,84 @@ class _InstallerPasswordDialogState
   Map<String, dynamic>? _activeOtp;
   bool _isLoadingOtp = false;
 
+  bool _isLoadingEmail = true;
+  String? _currentInstallerEmail;
+  String? _emailLoadError;
+  bool _isSavingEmail = false;
+  String? _emailSaveError;
+  bool _isEditingEmail = false;
+
   @override
   void initState() {
     super.initState();
     _fetchCurrentPassword();
     _fetchActiveOtp();
+    _fetchInstallerEmail();
   }
 
   @override
   void dispose() {
     _newPasswordController.dispose();
     _confirmPasswordController.dispose();
+    _emailController.dispose();
     super.dispose();
+  }
+
+  Future<void> _fetchInstallerEmail() async {
+    setState(() {
+      _isLoadingEmail = true;
+      _emailLoadError = null;
+    });
+    final res = await ref
+        .read(portalAdminRepositoryProvider)
+        .getInstallerAdminEmail();
+    if (!mounted) return;
+    setState(() {
+      _isLoadingEmail = false;
+      _currentInstallerEmail = res.valueOrNull;
+      _emailLoadError = res.errorOrNull?.message;
+      if (_currentInstallerEmail != null && _emailController.text.isEmpty) {
+        _emailController.text = _currentInstallerEmail!;
+      }
+    });
+  }
+
+  Future<void> _updateInstallerEmail() async {
+    final newEmail = _emailController.text.trim();
+    if (newEmail.isEmpty || !newEmail.contains('@') || !newEmail.contains('.')) {
+      setState(() => _emailSaveError = 'Please enter a valid email address.');
+      return;
+    }
+
+    setState(() {
+      _isSavingEmail = true;
+      _emailSaveError = null;
+    });
+
+    final res = await ref
+        .read(portalAdminRepositoryProvider)
+        .setInstallerAdminEmail(newEmail);
+
+    if (!mounted) return;
+    setState(() => _isSavingEmail = false);
+
+    if (res.isSuccess) {
+      setState(() {
+        _currentInstallerEmail = newEmail;
+        _isEditingEmail = false;
+      });
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Installer OTP recipient email updated successfully.'),
+          backgroundColor: AppColors.signalCredit,
+        ),
+      );
+    } else {
+      setState(() {
+        _emailSaveError =
+            res.errorOrNull?.message ?? 'Failed to update installer email.';
+      });
+    }
   }
 
   Future<void> _fetchCurrentPassword() async {
@@ -1999,11 +2175,11 @@ class _InstallerPasswordDialogState
         children: [
           Icon(Icons.key_rounded, color: AppColors.accentLedger, size: 22),
           SizedBox(width: 10),
-          Text('Windows Installer Password'),
+          Text('Windows Installer Security & OTP'),
         ],
       ),
       content: SizedBox(
-        width: 480,
+        width: 500,
         child: SingleChildScrollView(
           child: Column(
             mainAxisSize: MainAxisSize.min,
@@ -2027,7 +2203,7 @@ class _InstallerPasswordDialogState
                     const SizedBox(width: 8),
                     Expanded(
                       child: Text(
-                        'This password is required during Step 2 of the ARMSS Gateway setup wizard (ARMSS_Gateway_Setup.exe). Changing it takes effect immediately for all new installations.',
+                        'This dialog controls Step 1 setup verification OTP delivery and Step 2 installation password for ARMSS_Gateway_Setup.exe.',
                         style: TextStyle(
                           fontSize: 12,
                           color: Colors.amber.shade900,
@@ -2119,7 +2295,148 @@ class _InstallerPasswordDialogState
                   ),
                 ),
               ],
+              const SizedBox(height: 18),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  const Text(
+                    'Installer OTP Recipient Email:',
+                    style: TextStyle(
+                      fontSize: 13,
+                      fontWeight: FontWeight.w600,
+                      color: AppColors.inkPrimary,
+                    ),
+                  ),
+                  if (!_isLoadingEmail && !_isEditingEmail)
+                    InkWell(
+                      onTap: () {
+                        setState(() {
+                          _isEditingEmail = true;
+                          _emailController.text = _currentInstallerEmail ?? '';
+                          _emailSaveError = null;
+                        });
+                      },
+                      borderRadius: BorderRadius.circular(4),
+                      child: const Padding(
+                        padding: EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(Icons.edit_outlined, size: 14, color: AppColors.accentLedger),
+                            SizedBox(width: 4),
+                            Text(
+                              'Change',
+                              style: TextStyle(
+                                fontSize: 12,
+                                color: AppColors.accentLedger,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                ],
+              ),
+              const SizedBox(height: 4),
+              const Text(
+                'Step 1 installer setup OTP codes are sent to this email via Bird API.',
+                style: TextStyle(fontSize: 11, color: AppColors.inkSecondary),
+              ),
+              const SizedBox(height: 8),
+              if (!_isEditingEmail) ...[
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                  decoration: BoxDecoration(
+                    color: AppColors.surfaceSunken,
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(color: AppColors.lineHairline),
+                  ),
+                  child: Row(
+                    children: [
+                      const Icon(Icons.mark_email_unread_outlined, size: 18, color: AppColors.accentLedger),
+                      const SizedBox(width: 10),
+                      if (_isLoadingEmail)
+                        const SizedBox(
+                          width: 14,
+                          height: 14,
+                          child: CircularProgressIndicator(strokeWidth: 2),
+                        )
+                      else if (_emailLoadError != null)
+                        Expanded(
+                          child: Text(
+                            _emailLoadError!,
+                            style: const TextStyle(fontSize: 12, color: AppColors.signalError),
+                          ),
+                        )
+                      else
+                        Expanded(
+                          child: SelectableText(
+                            _currentInstallerEmail ?? 'Not configured (fallback to .env)',
+                            style: const TextStyle(
+                              fontFamily: 'IBM Plex Mono',
+                              fontSize: 13,
+                              fontWeight: FontWeight.w600,
+                              color: AppColors.inkPrimary,
+                            ),
+                          ),
+                        ),
+                    ],
+                  ),
+                ),
+              ] else ...[
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Expanded(
+                      child: TextField(
+                        controller: _emailController,
+                        keyboardType: TextInputType.emailAddress,
+                        decoration: const InputDecoration(
+                          labelText: 'Installer Admin Email',
+                          hintText: 'e.g. admin@arminfo.in',
+                          isDense: true,
+                          prefixIcon: Icon(Icons.mail_outline, size: 18),
+                          border: OutlineInputBorder(),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    ElevatedButton(
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: AppColors.accentLedger,
+                        foregroundColor: Colors.white,
+                        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(6)),
+                      ),
+                      onPressed: _isSavingEmail ? null : _updateInstallerEmail,
+                      child: _isSavingEmail
+                          ? const SizedBox(
+                              width: 16,
+                              height: 16,
+                              child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                            )
+                          : const Text('Save', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
+                    ),
+                    const SizedBox(width: 4),
+                    IconButton(
+                      icon: const Icon(Icons.close, size: 18),
+                      tooltip: 'Cancel',
+                      onPressed: _isSavingEmail ? null : () => setState(() => _isEditingEmail = false),
+                    ),
+                  ],
+                ),
+                if (_emailSaveError != null) ...[
+                  const SizedBox(height: 6),
+                  Text(
+                    _emailSaveError!,
+                    style: const TextStyle(fontSize: 12, color: AppColors.signalError),
+                  ),
+                ],
+              ],
               const SizedBox(height: 20),
+              const Divider(height: 1),
+              const SizedBox(height: 16),
               const Text(
                 'Current Installer Password:',
                 style: TextStyle(
