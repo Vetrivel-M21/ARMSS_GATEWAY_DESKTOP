@@ -13,6 +13,8 @@ abstract class PortalAuthRepository {
   Future<Result<PortalSession>> login({
     required String identifier,
     required String password,
+    String? deviceId,
+    String? machineFingerprint,
   });
   Future<Result<PortalSession>> me(String token);
   Future<Result<void>> forgotPasswordRequest(String email);

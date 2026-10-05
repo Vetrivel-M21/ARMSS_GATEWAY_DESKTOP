@@ -8,6 +8,7 @@ import '../../../../app/di/providers.dart';
 import '../../../../core/database/app_database.dart';
 import '../../../../core/rbac/current_user_provider.dart';
 import '../../../../core/theme/app_theme.dart';
+import '../../../../core/updates/app_update_service.dart';
 import '../../../portal_admin/presentation/screens/portal_users_admin_screen.dart';
 import '../../../portal_auth/presentation/controllers/portal_auth_controllers.dart';
 
@@ -55,9 +56,15 @@ class _UserProfileScreenState extends ConsumerState<UserProfileScreen> {
   int _otpCooldown = 0;
   Timer? _cooldownTimer;
 
+  bool _isCheckingUpdate = false;
+  String _currentVersionStr = '1.1.10';
+
   @override
   void initState() {
     super.initState();
+    getCurrentAppVersion().then((v) {
+      if (mounted) setState(() => _currentVersionStr = v);
+    });
     _usernameController = TextEditingController();
     _emailController = TextEditingController();
     _fullNameController = TextEditingController();
@@ -535,13 +542,19 @@ class _UserProfileScreenState extends ConsumerState<UserProfileScreen> {
                     child: Row(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        // Left Column: Profile details
+                        // Left Column: Profile details & App Updates
                         Expanded(
                           flex: 5,
-                          child: _buildProfileCard(
-                            username: username,
-                            email: email,
-                            roleName: isAdmin ? 'Administrator' : 'Portal User',
+                          child: Column(
+                            children: [
+                              _buildProfileCard(
+                                username: username,
+                                email: email,
+                                roleName: isAdmin ? 'Administrator' : 'Portal User',
+                              ),
+                              const SizedBox(height: AppSpacing.lg),
+                              _buildAppUpdateCard(context),
+                            ],
                           ),
                         ),
                         const SizedBox(width: AppSpacing.xl),
@@ -557,6 +570,114 @@ class _UserProfileScreenState extends ConsumerState<UserProfileScreen> {
                     ),
                   ),
                 ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Future<void> _checkForAppUpdate() async {
+    setState(() => _isCheckingUpdate = true);
+    try {
+      final service = AppUpdateService();
+      final update = await service.check();
+      if (!mounted) return;
+      if (update != null) {
+        await showDesktopUpdateDialog(
+          context,
+          updateInfo: update,
+          currentVersion: _currentVersionStr,
+        );
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Row(
+              children: [
+                const Icon(Icons.check_circle_rounded, color: Colors.white, size: 20),
+                const SizedBox(width: 8),
+                Text('ARMSS Gateway is up to date (v$_currentVersionStr)'),
+              ],
+            ),
+            backgroundColor: const Color(0xFF10B981),
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+      }
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Update check error: $e'),
+          backgroundColor: Colors.red.shade700,
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+    } finally {
+      if (mounted) setState(() => _isCheckingUpdate = false);
+    }
+  }
+
+  Widget _buildAppUpdateCard(BuildContext context) {
+    return Card(
+      elevation: 0,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(12),
+        side: const BorderSide(color: AppColors.lineHairline),
+      ),
+      color: AppColors.surfacePanel,
+      child: Padding(
+        padding: const EdgeInsets.all(AppSpacing.lg),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF10B981).withValues(alpha: 0.12),
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: const Icon(Icons.system_update_rounded, size: 20, color: Color(0xFF10B981)),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Text(
+                        'App Version & Updates',
+                        style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: AppColors.inkPrimary),
+                      ),
+                      Text(
+                        'Installed Version: v$_currentVersionStr',
+                        style: const TextStyle(fontSize: 12, color: AppColors.inkSecondary),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 14),
+            SizedBox(
+              width: double.infinity,
+              child: OutlinedButton.icon(
+                style: OutlinedButton.styleFrom(
+                  padding: const EdgeInsets.symmetric(vertical: 11),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                  side: const BorderSide(color: AppColors.lineHairline),
+                ),
+                icon: _isCheckingUpdate
+                    ? const SizedBox(
+                        width: 14,
+                        height: 14,
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      )
+                    : const Icon(Icons.refresh_rounded, size: 16),
+                label: Text(_isCheckingUpdate ? 'Checking Server...' : 'Check for Updates'),
+                onPressed: _isCheckingUpdate ? null : _checkForAppUpdate,
               ),
             ),
           ],

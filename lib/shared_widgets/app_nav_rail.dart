@@ -59,8 +59,58 @@ class AppNavRail extends StatelessWidget {
   }
 }
 
-class _NavRailVersionFooter extends StatelessWidget {
+class _NavRailVersionFooter extends StatefulWidget {
   const _NavRailVersionFooter();
+
+  @override
+  State<_NavRailVersionFooter> createState() => _NavRailVersionFooterState();
+}
+
+class _NavRailVersionFooterState extends State<_NavRailVersionFooter> {
+  bool _isChecking = false;
+
+  Future<void> _checkUpdate(BuildContext context, String currentVer) async {
+    if (_isChecking) return;
+    setState(() => _isChecking = true);
+    try {
+      final update = await AppUpdateService().check();
+      if (!context.mounted) return;
+      if (update != null) {
+        await showDesktopUpdateDialog(
+          context,
+          updateInfo: update,
+          currentVersion: currentVer,
+        );
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Row(
+              children: [
+                const Icon(Icons.check_circle_rounded, color: Colors.white, size: 18),
+                const SizedBox(width: 8),
+                Text('ARMSS Gateway is up to date (v$currentVer)'),
+              ],
+            ),
+            backgroundColor: const Color(0xFF10B981),
+            behavior: SnackBarBehavior.floating,
+            duration: const Duration(seconds: 3),
+          ),
+        );
+      }
+    } catch (e) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Update check failed: $e'),
+            backgroundColor: Colors.red.shade700,
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _isChecking = false);
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -72,8 +122,8 @@ class _NavRailVersionFooter extends StatelessWidget {
         return Container(
           width: double.infinity,
           padding: const EdgeInsets.symmetric(
-            horizontal: AppSpacing.lg,
-            vertical: 14,
+            horizontal: AppSpacing.md,
+            vertical: 10,
           ),
           decoration: BoxDecoration(
             border: Border(
@@ -84,21 +134,47 @@ class _NavRailVersionFooter extends StatelessWidget {
             ),
           ),
           child: Row(
-            mainAxisSize: MainAxisSize.min,
             children: [
               Icon(
                 Icons.info_outline_rounded,
                 size: 14,
                 color: AppColors.navRailDarkText.withValues(alpha: 0.5),
               ),
-              const SizedBox(width: 8),
-              Text(
-                'v$version',
-                style: TextStyle(
-                  fontSize: 12,
-                  fontWeight: FontWeight.w500,
-                  letterSpacing: 0.3,
-                  color: AppColors.navRailDarkText.withValues(alpha: 0.7),
+              const SizedBox(width: 6),
+              Expanded(
+                child: Text(
+                  'v$version',
+                  style: TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w500,
+                    letterSpacing: 0.3,
+                    color: AppColors.navRailDarkText.withValues(alpha: 0.7),
+                  ),
+                ),
+              ),
+              Tooltip(
+                message: 'Check for Updates',
+                child: InkWell(
+                  onTap: _isChecking ? null : () => _checkUpdate(context, version),
+                  borderRadius: BorderRadius.circular(6),
+                  hoverColor: Colors.white.withValues(alpha: 0.1),
+                  child: Padding(
+                    padding: const EdgeInsets.all(4.0),
+                    child: _isChecking
+                        ? const SizedBox(
+                            width: 14,
+                            height: 14,
+                            child: CircularProgressIndicator(
+                              strokeWidth: 1.8,
+                              valueColor: AlwaysStoppedAnimation<Color>(Colors.white70),
+                            ),
+                          )
+                        : Icon(
+                            Icons.refresh_rounded,
+                            size: 15,
+                            color: AppColors.navRailDarkText.withValues(alpha: 0.8),
+                          ),
+                  ),
                 ),
               ),
             ],

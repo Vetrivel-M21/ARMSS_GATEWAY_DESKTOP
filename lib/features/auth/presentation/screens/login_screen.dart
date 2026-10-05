@@ -73,7 +73,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
       setState(() {
         _isSubmitting = false;
         _errorMessage =
-            'This device is permanently registered to "$name". Other accounts (including Admin) cannot log in. Reinstall the application to switch accounts.';
+            'This device is registered to "$name". To switch accounts, please release the device lock in the Admin Portal.';
       });
       return;
     }
@@ -155,7 +155,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                                       ),
                                       const SizedBox(height: 2),
                                       Text(
-                                        'Other accounts cannot log in. Reinstall app to change.',
+                                        'Other accounts cannot log in. Release device lock in Admin Portal to change.',
                                         style: TextStyle(
                                           fontSize: 10,
                                           color: Theme.of(context).textTheme.bodySmall?.color?.withValues(alpha: 0.75),

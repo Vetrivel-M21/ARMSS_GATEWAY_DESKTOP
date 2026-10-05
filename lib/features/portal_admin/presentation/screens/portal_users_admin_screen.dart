@@ -59,8 +59,12 @@ class _PortalUsersAdminScreenState extends ConsumerState<PortalUsersAdminScreen>
   // ── Search state ────────────────────────────────────────────────────────────
   final TextEditingController _userSearchCtrl = TextEditingController();
   final TextEditingController _deviceSearchCtrl = TextEditingController();
+  final TextEditingController _requestSearchCtrl = TextEditingController();
+  final TextEditingController _linkSearchCtrl = TextEditingController();
   String _userQuery = '';
   String _deviceQuery = '';
+  String _requestQuery = '';
+  String _linkQuery = '';
 
   @override
   void initState() {
@@ -85,6 +89,8 @@ class _PortalUsersAdminScreenState extends ConsumerState<PortalUsersAdminScreen>
     _tabController.dispose();
     _userSearchCtrl.dispose();
     _deviceSearchCtrl.dispose();
+    _requestSearchCtrl.dispose();
+    _linkSearchCtrl.dispose();
     super.dispose();
   }
 
@@ -402,6 +408,55 @@ class _PortalUsersAdminScreenState extends ConsumerState<PortalUsersAdminScreen>
         SnackBar(
           content: Text(
             result.errorOrNull?.message ?? 'Failed to update user role.',
+          ),
+        ),
+      );
+    }
+  }
+
+  Future<void> _releaseDeviceLock(AdminPortalUser user) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (_) => AlertDialog(
+        title: const Text('Release Device Lock?'),
+        content: Text(
+          'Are you sure you want to release the device lock for "${user.fullName}" (@${user.username})?\n\n'
+          'Current Bound Device: ${user.boundDeviceId}\n\n'
+          'This will allow the user to log in on a new device. Their active session will be terminated immediately.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(false),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            style: FilledButton.styleFrom(backgroundColor: Colors.orange.shade800),
+            onPressed: () => Navigator.of(context).pop(true),
+            child: const Text('Release Lock'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed != true || !mounted) return;
+
+    final result = await ref
+        .read(portalAdminRepositoryProvider)
+        .releaseDeviceLock(user.id);
+    if (!mounted) return;
+    if (result.isSuccess) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Device lock released for "${user.fullName}".'),
+        ),
+      );
+      _loadUsers();
+      _loadDevices();
+    } else {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            result.errorOrNull?.message ?? 'Failed to release device lock.',
           ),
         ),
       );
@@ -933,8 +988,32 @@ class _PortalUsersAdminScreenState extends ConsumerState<PortalUsersAdminScreen>
                       ),
                     ],
                   ),
-                  subtitle: Text(
-                    '${user.username} · ${user.email} · ${user.department} · ${user.branch}',
+                  subtitle: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text(
+                        '${user.username} · ${user.email} · ${user.department} · ${user.branch}',
+                      ),
+                      if (user.boundDeviceId.isNotEmpty) ...[
+                        const SizedBox(height: 3),
+                        Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            const Icon(Icons.devices, size: 13, color: AppColors.inkSecondary),
+                            const SizedBox(width: 4),
+                            Text(
+                              'Device Locked: ${user.boundDeviceId}',
+                              style: const TextStyle(
+                                fontSize: 11,
+                                color: AppColors.inkSecondary,
+                                fontStyle: FontStyle.italic,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ],
+                    ],
                   ),
                   trailing: Row(
                     mainAxisSize: MainAxisSize.min,
@@ -958,6 +1037,7 @@ class _PortalUsersAdminScreenState extends ConsumerState<PortalUsersAdminScreen>
                           if (action == 'view_password') _viewPassword(user);
                           if (action == 'change_password') _changePassword(user);
                           if (action == 'change_role') _changeRole(user);
+                          if (action == 'release_device_lock') _releaseDeviceLock(user);
                           if (action == 'delete_user') _deleteUser(user);
                         },
                         itemBuilder: (context) => [
@@ -988,6 +1068,26 @@ class _PortalUsersAdminScreenState extends ConsumerState<PortalUsersAdminScreen>
                               ],
                             ),
                           ),
+                          if (user.boundDeviceId.isNotEmpty) ...[
+                            const PopupMenuDivider(),
+                            const PopupMenuItem(
+                              value: 'release_device_lock',
+                              child: Row(
+                                children: [
+                                  Icon(
+                                    Icons.phonelink_erase,
+                                    size: 18,
+                                    color: Colors.orange,
+                                  ),
+                                  SizedBox(width: 8),
+                                  Text(
+                                    'Release Device Lock',
+                                    style: TextStyle(color: Colors.orange),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ],
                           const PopupMenuDivider(),
                           const PopupMenuItem(
                             value: 'delete_user',
@@ -1032,40 +1132,103 @@ class _PortalUsersAdminScreenState extends ConsumerState<PortalUsersAdminScreen>
     if (_linkError != null) return Center(child: Text(_linkError!));
     final links = _links;
     if (links == null) return const Center(child: CircularProgressIndicator());
+
+    // ── Filter links by search query ──────────────────────────────────────────
+    final lq = _linkQuery.trim().toLowerCase();
+    final filteredLinks = lq.isEmpty
+        ? links
+        : links.where((l) {
+            return l.name.toLowerCase().contains(lq) ||
+                l.tabName.toLowerCase().contains(lq) ||
+                l.url.toLowerCase().contains(lq) ||
+                l.key.toLowerCase().contains(lq);
+          }).toList();
+
     return Column(
       children: [
-        Align(
-          alignment: Alignment.centerRight,
-          child: Padding(
-            padding: const EdgeInsets.fromLTRB(20, 12, 20, 4),
-            child: FilledButton.icon(
-              onPressed: () => _editLink(),
-              icon: const Icon(Icons.add),
-              label: const Text('Add Web App'),
+        // ── Search bar and Add Web App button ────────────────────────────────
+        Padding(
+          padding: const EdgeInsets.fromLTRB(20, 14, 20, 4),
+          child: Row(
+            children: [
+              Expanded(
+                child: TextField(
+                  controller: _linkSearchCtrl,
+                  onChanged: (v) => setState(() => _linkQuery = v),
+                  decoration: InputDecoration(
+                    hintText: 'Search web apps by name, tab, URL or key…',
+                    prefixIcon: const Icon(Icons.search, size: 20),
+                    suffixIcon: _linkQuery.isNotEmpty
+                        ? IconButton(
+                            icon: const Icon(Icons.close, size: 18),
+                            tooltip: 'Clear search',
+                            onPressed: () {
+                              _linkSearchCtrl.clear();
+                              setState(() => _linkQuery = '');
+                            },
+                          )
+                        : null,
+                    isDense: true,
+                    contentPadding: const EdgeInsets.symmetric(
+                      vertical: 10,
+                      horizontal: 14,
+                    ),
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    filled: true,
+                    fillColor: AppColors.surfacePanel,
+                  ),
+                ),
+              ),
+              const SizedBox(width: 12),
+              FilledButton.icon(
+                onPressed: () => _editLink(),
+                icon: const Icon(Icons.add),
+                label: const Text('Add Web App'),
+              ),
+            ],
+          ),
+        ),
+        if (filteredLinks.isEmpty)
+          Expanded(
+            child: Center(
+              child: Text(
+                lq.isEmpty
+                    ? 'No web apps registered yet.'
+                    : 'No web apps match "$lq".',
+                style: const TextStyle(color: AppColors.inkSecondary),
+              ),
+            ),
+          )
+        else
+          Expanded(
+            child: ListView.separated(
+              padding: const EdgeInsets.all(20),
+              itemCount: filteredLinks.length,
+              separatorBuilder: (_, __) => const Divider(height: 1),
+              itemBuilder: (_, index) {
+                final link = filteredLinks[index];
+                return ListTile(
+                  leading: const Icon(Icons.language_outlined),
+                  title: Text(link.name),
+                  subtitle: Text('${link.tabName} · ${link.url}'),
+                  trailing: Wrap(
+                    children: [
+                      IconButton(
+                        onPressed: () => _editLink(link),
+                        icon: const Icon(Icons.edit_outlined),
+                      ),
+                      IconButton(
+                        onPressed: () => _deleteLink(link),
+                        icon: const Icon(Icons.delete_outline),
+                      ),
+                    ],
+                  ),
+                );
+              },
             ),
           ),
-        ),
-        Expanded(
-          child: ListView.separated(
-            padding: const EdgeInsets.all(20),
-            itemCount: links.length,
-            separatorBuilder: (_, __) => const Divider(height: 1),
-            itemBuilder: (_, index) {
-              final link = links[index];
-              return ListTile(
-                leading: const Icon(Icons.language_outlined),
-                title: Text(link.name),
-                subtitle: Text('${link.tabName} · ${link.url}'),
-                trailing: Wrap(
-                  children: [
-                    IconButton(onPressed: () => _editLink(link), icon: const Icon(Icons.edit_outlined)),
-                    IconButton(onPressed: () => _deleteLink(link), icon: const Icon(Icons.delete_outline)),
-                  ],
-                ),
-              );
-            },
-          ),
-        ),
       ],
     );
   }
@@ -1426,12 +1589,73 @@ class _PortalUsersAdminScreenState extends ConsumerState<PortalUsersAdminScreen>
 
     final dateFormat = DateFormat('yyyy-MM-dd HH:mm');
 
-    return ListView.separated(
-      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
-      itemCount: requests.length,
-      separatorBuilder: (_, _) => const Divider(height: 1),
-      itemBuilder: (context, index) {
-        final req = requests[index];
+    // ── Filter requests by search query ──────────────────────────────────────
+    final rq = _requestQuery.trim().toLowerCase();
+    final filteredRequests = rq.isEmpty
+        ? requests
+        : requests.where((r) {
+            final name = (r.fullName.isNotEmpty ? r.fullName : r.username).toLowerCase();
+            return name.contains(rq) ||
+                r.username.toLowerCase().contains(rq) ||
+                r.email.toLowerCase().contains(rq) ||
+                r.domainRequested.toLowerCase().contains(rq) ||
+                r.deviceId.toLowerCase().contains(rq) ||
+                r.status.toLowerCase().contains(rq);
+          }).toList();
+
+    return Column(
+      children: [
+        // ── Search bar ────────────────────────────────────────────────────────
+        Padding(
+          padding: const EdgeInsets.fromLTRB(20, 14, 20, 4),
+          child: TextField(
+            controller: _requestSearchCtrl,
+            onChanged: (v) => setState(() => _requestQuery = v),
+            decoration: InputDecoration(
+              hintText: 'Search requests by user, username, email, domain, device ID or status…',
+              prefixIcon: const Icon(Icons.search, size: 20),
+              suffixIcon: _requestQuery.isNotEmpty
+                  ? IconButton(
+                      icon: const Icon(Icons.close, size: 18),
+                      tooltip: 'Clear search',
+                      onPressed: () {
+                        _requestSearchCtrl.clear();
+                        setState(() => _requestQuery = '');
+                      },
+                    )
+                  : null,
+              isDense: true,
+              contentPadding: const EdgeInsets.symmetric(
+                vertical: 10,
+                horizontal: 14,
+              ),
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(8),
+              ),
+              filled: true,
+              fillColor: AppColors.surfacePanel,
+            ),
+          ),
+        ),
+        if (filteredRequests.isEmpty)
+          Expanded(
+            child: Center(
+              child: Text(
+                rq.isEmpty
+                    ? 'No activation requests found.'
+                    : 'No activation requests match "$rq".',
+                style: const TextStyle(color: AppColors.inkSecondary),
+              ),
+            ),
+          )
+        else
+          Expanded(
+            child: ListView.separated(
+              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+              itemCount: filteredRequests.length,
+              separatorBuilder: (_, _) => const Divider(height: 1),
+              itemBuilder: (context, index) {
+                final req = filteredRequests[index];
         final isPending = req.status == 'pending';
         final isApproved = req.status == 'approved';
 
@@ -1610,6 +1834,9 @@ class _PortalUsersAdminScreenState extends ConsumerState<PortalUsersAdminScreen>
                       )),
         );
       },
+    ),
+  ),
+      ],
     );
   }
 

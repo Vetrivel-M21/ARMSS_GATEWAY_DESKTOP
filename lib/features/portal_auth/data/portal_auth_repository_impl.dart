@@ -87,11 +87,16 @@ class PortalAuthRepositoryImpl implements PortalAuthRepository {
   Future<Result<PortalSession>> login({
     required String identifier,
     required String password,
+    String? deviceId,
+    String? machineFingerprint,
   }) async {
     try {
       final body = await _post('/portal/login', {
         'identifier': identifier,
         'password': password,
+        if (deviceId != null && deviceId.isNotEmpty) 'device_id': deviceId,
+        if (machineFingerprint != null && machineFingerprint.isNotEmpty)
+          'machine_fingerprint': machineFingerprint,
       });
       if (body['success'] != true) {
         return Failure(

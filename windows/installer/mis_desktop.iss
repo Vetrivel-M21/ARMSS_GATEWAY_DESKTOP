@@ -5,7 +5,7 @@
 ; See README.md in this folder for the full process.
 
 #define MyAppName "ARMSS Gateway"
-#define MyAppVersion "1.1.7"
+#define MyAppVersion "1.1.10"
 #define MyAppExeName "armss_gateway.exe"
 #define MyReleaseDir "..\..\build\windows\x64\runner\Release"
 #define VCRedistInstaller "prerequisites\vc_redist.x64.exe"
@@ -60,6 +60,7 @@ Filename: "{app}\{#MyAppExeName}"; Description: "{cm:LaunchProgram,{#MyAppName}}
 Type: filesandordirs; Name: "{localappdata}\ARMSS Gateway"
 Type: filesandordirs; Name: "{localappdata}\Programs\ARMSS Gateway"
 Type: filesandordirs; Name: "{app}"
+Type: filesandordirs; Name: "{userappdata}\com.armssgroups"
 
 [Code]
 var
@@ -183,10 +184,40 @@ end;
 
 function GenerateDeviceId: String;
 var
-DT: String;
+MachineGuid: String;
 begin
-DT := GetDateTimeString('yyyymmddhhnnss', #0, #0);
-Result := 'dev_' + DT + '_' + IntToStr(Random(1000000)) + IntToStr(Random(1000000));
+if RegQueryStringValue(HKLM, 'SOFTWARE\Microsoft\Cryptography', 'MachineGuid', MachineGuid) and (MachineGuid <> '') then
+begin
+Result := 'dev_' + Lowercase(MachineGuid);
+StringChangeEx(Result, '-', '', True);
+StringChangeEx(Result, '{', '', True);
+StringChangeEx(Result, '}', '', True);
+end
+else
+begin
+Result := 'dev_' + GetDateTimeString('yyyymmddhhnnss', #0, #0) + '_' + IntToStr(Random(1000000));
+end;
+end;
+
+procedure CleanLegacyPreferences;
+var
+PrefDir, LocalDir: String;
+begin
+PrefDir := ExpandConstant('{userappdata}\com.armssgroups');
+if DirExists(PrefDir) then
+DelTree(PrefDir, True, True, True);
+
+LocalDir := ExpandConstant('{localappdata}\ARMSS Gateway');
+if DirExists(LocalDir) then
+DelTree(LocalDir, True, True, True);
+end;
+
+procedure CurUninstallStepChanged(CurUninstallStep: TUninstallStep);
+begin
+if CurUninstallStep = usPostUninstall then
+begin
+CleanLegacyPreferences;
+end;
 end;
 
 procedure SaveDeviceCredentials(const DevID, DevToken: String);
@@ -293,7 +324,7 @@ VerifiedUserID := ExtractJsonIntField(ResponseText, 'user_id');
 if VerifiedUserID = '' then
 VerifiedUserID := ExtractJsonStringField(ResponseText, 'user_id');
 if VerifiedUserID = '' then
-VerifiedUserID := '1';
+VerifiedUserID := '0';
 
 // Generate unique device id and register device
 DeviceID := GenerateDeviceId;
@@ -303,6 +334,8 @@ begin
 DeviceToken := ExtractJsonStringField(ResponseText, 'token');
 if DeviceToken <> '' then
 begin
+if not UpdateMode then
+CleanLegacyPreferences;
 SaveDeviceCredentials(DeviceID, DeviceToken);
 Result := True;
 end

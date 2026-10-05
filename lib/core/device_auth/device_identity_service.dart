@@ -54,7 +54,7 @@ class DeviceIdentityService {
     }
 
     if (deviceId == null) {
-      deviceId = _generateDeviceId();
+      deviceId = await _getStableHardwareDeviceId();
       await prefs.setString(_prefDeviceId, deviceId);
     }
 
@@ -77,7 +77,7 @@ class DeviceIdentityService {
     final prefs = await SharedPreferences.getInstance();
     var id = prefs.getString(_prefDeviceId);
     if (id == null) {
-      id = _generateDeviceId();
+      id = await _getStableHardwareDeviceId();
       await prefs.setString(_prefDeviceId, id);
     }
     _cachedDeviceId = id;
@@ -199,7 +199,32 @@ class DeviceIdentityService {
     } catch (_) {}
   }
 
-  String _generateDeviceId() {
+  Future<String> _getStableHardwareDeviceId() async {
+    if (Platform.isWindows) {
+      try {
+        final result = await Process.run('reg', [
+          'query',
+          r'HKLM\SOFTWARE\Microsoft\Cryptography',
+          '/v',
+          'MachineGuid',
+        ]);
+        if (result.exitCode == 0) {
+          final output = result.stdout as String;
+          final match = RegExp(r'MachineGuid\s+REG_SZ\s+([^\r\n]+)').firstMatch(output);
+          if (match != null && match.group(1) != null) {
+            var rawGuid = match.group(1)!.trim().toLowerCase();
+            rawGuid = rawGuid.replaceAll('-', '').replaceAll('{', '').replaceAll('}', '');
+            if (rawGuid.isNotEmpty) {
+              return 'dev_$rawGuid';
+            }
+          }
+        }
+      } catch (_) {}
+    }
+    return _generateRandomDeviceId();
+  }
+
+  String _generateRandomDeviceId() {
     final random = Random.secure();
     final values = List<int>.generate(16, (i) => random.nextInt(256));
     final hex = values.map((b) => b.toRadixString(16).padLeft(2, '0')).join();

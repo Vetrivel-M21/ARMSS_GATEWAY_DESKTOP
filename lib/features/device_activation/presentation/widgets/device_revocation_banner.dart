@@ -3,9 +3,10 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../../core/theme/app_theme.dart';
 import '../controllers/device_access_controller.dart';
+import '../monthly_reverify_dialog.dart';
 
 /// A persistent notification strip displayed immediately below the App Bar
-/// whenever device token access is revoked or an activation request is pending.
+/// whenever device token access is revoked, pending activation, or requires monthly OTP verification.
 class DeviceRevocationBanner extends ConsumerWidget {
   const DeviceRevocationBanner({super.key});
 
@@ -13,25 +14,33 @@ class DeviceRevocationBanner extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final access = ref.watch(deviceAccessControllerProvider);
 
-    if (!access.isRevoked) {
+    final showBanner = (access.isRevoked || access.isOtpReverifyRequired) &&
+        access.lastCheckedAt != null;
+    if (!showBanner) {
       return const SizedBox.shrink();
     }
 
-    final isPending = access.requestStatus == 'pending';
-    final isRejected = access.requestStatus == 'rejected';
+    final isOtpReverify = access.isOtpReverifyRequired ||
+        access.reason == 'otp_reverification_required';
+    final isPending = !isOtpReverify && access.requestStatus == 'pending';
+    final isRejected = !isOtpReverify && access.requestStatus == 'rejected';
 
-    final Color borderColor = isPending
+    final Color borderColor = (isPending || isOtpReverify)
         ? AppColors.signalAmber
         : AppColors.signalError;
-    final Color bgColor = isPending
+    final Color bgColor = (isPending || isOtpReverify)
         ? AppColors.signalAmber.withValues(alpha: 0.08)
         : AppColors.signalError.withValues(alpha: 0.08);
-    final IconData icon = isPending
-        ? Icons.hourglass_top_rounded
-        : Icons.gpp_bad_outlined;
+    final IconData icon = isOtpReverify
+        ? Icons.verified_user_outlined
+        : isPending
+            ? Icons.hourglass_top_rounded
+            : Icons.gpp_bad_outlined;
 
     String title;
-    if (isPending) {
+    if (isOtpReverify) {
+      title = 'Monthly Security Verification Required';
+    } else if (isPending) {
       title = 'Activation Request Pending Administrator Approval';
     } else if (isRejected) {
       title = 'Access Revoked — Activation Request Rejected';
@@ -40,7 +49,10 @@ class DeviceRevocationBanner extends ConsumerWidget {
     }
 
     String details;
-    if (isPending) {
+    if (isOtpReverify) {
+      details =
+          'Routine 30-day security check is due. Please verify via email OTP to continue accessing portals.';
+    } else if (isPending) {
       details =
           'An access request for this device has been sent to the administrator. Device ID: ${access.deviceId}';
     } else if (isRejected && access.rejectionReason != null) {
@@ -89,7 +101,7 @@ class DeviceRevocationBanner extends ConsumerWidget {
                   style: TextStyle(
                     fontSize: 13,
                     fontWeight: FontWeight.w700,
-                    color: isPending
+                    color: (isPending || isOtpReverify)
                         ? const Color(0xFF92400E)
                         : const Color(0xFF991B1B),
                   ),
@@ -99,7 +111,7 @@ class DeviceRevocationBanner extends ConsumerWidget {
                   details,
                   style: TextStyle(
                     fontSize: 12,
-                    color: isPending
+                    color: (isPending || isOtpReverify)
                         ? const Color(0xFFB45309)
                         : const Color(0xFFB91C1C),
                   ),
@@ -115,6 +127,36 @@ class DeviceRevocationBanner extends ConsumerWidget {
               width: 24,
               height: 24,
               child: CircularProgressIndicator(strokeWidth: 2),
+            )
+          else if (isOtpReverify)
+            FilledButton.icon(
+              style: FilledButton.styleFrom(
+                backgroundColor: const Color(0xFFD97706),
+                foregroundColor: Colors.white,
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 14,
+                  vertical: 8,
+                ),
+                textStyle: const TextStyle(
+                  fontSize: 12,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+              icon: const Icon(Icons.mark_email_read_outlined, size: 16),
+              label: const Text('Verify Monthly OTP'),
+              onPressed: () async {
+                final verified = await showDialog<bool>(
+                  context: context,
+                  barrierDismissible: false,
+                  builder: (_) =>
+                      MonthlyReverifyDialog(deviceId: access.deviceId),
+                );
+                if (verified == true) {
+                  await ref
+                      .read(deviceAccessControllerProvider.notifier)
+                      .checkStatus();
+                }
+              },
             )
           else if (isPending)
             OutlinedButton.icon(

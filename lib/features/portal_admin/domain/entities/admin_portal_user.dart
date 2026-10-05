@@ -6,6 +6,7 @@ class AdminPortalUser {
   final String department;
   final String branch;
   final String role;
+  final String boundDeviceId;
   final bool isActive;
   final List<String> grantedLinkKeys;
 
@@ -21,6 +22,7 @@ class AdminPortalUser {
     required this.department,
     required this.branch,
     this.role = 'user',
+    this.boundDeviceId = '',
     required this.isActive,
     required this.grantedLinkKeys,
   });

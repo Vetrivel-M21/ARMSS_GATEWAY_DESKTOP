@@ -31,6 +31,7 @@ abstract class PortalAdminRepository {
     required List<String> linkKeys,
   });
   Future<Result<void>> deleteUser(int userId);
+  Future<Result<void>> releaseDeviceLock(int userId);
 
   Future<Result<List<AdminDevice>>> listDevices();
   Future<Result<void>> revokeDevice(String deviceId);

@@ -1,3 +1,5 @@
+import 'dart:io';
+
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -33,18 +35,17 @@ class PortalSessionController extends AsyncNotifier<PortalSession?> {
       if (session != null) {
         // Auto-migration for existing users: if device is not yet bound to an account,
         // bind it immediately to this active session user without disrupting them.
-        final bindingService = ref.read(deviceAccountBindingServiceProvider);
-        final bound = await bindingService.getBoundAccount();
-        if (bound == null && session.userId != null) {
-          await bindingService.bindAccount(
-            userId: session.userId!,
-            username: session.username,
-            email: session.email,
-          );
-        }
-
-        if (session.userId != null && session.userId! > 0) {
-          DeviceIdentityService().registerDeviceOnServer(userId: session.userId);
+        final isAdmin = session.role == 'admin' || session.username.toLowerCase() == 'admin';
+        if (!isAdmin) {
+          final bindingService = ref.read(deviceAccountBindingServiceProvider);
+          final bound = await bindingService.getBoundAccount();
+          if (bound == null && session.userId != null) {
+            await bindingService.bindAccount(
+              userId: session.userId!,
+              username: session.username,
+              email: session.email,
+            );
+          }
         }
       }
       return session;
@@ -72,63 +73,64 @@ class PortalSessionController extends AsyncNotifier<PortalSession?> {
     required String password,
   }) async {
     final bindingService = ref.read(deviceAccountBindingServiceProvider);
+    final deviceId = await DeviceIdentityService().getDeviceId();
 
-    // 1. Device Lock Check: verify entered identifier is allowed
+    // 1. Device Lock Check: verify entered identifier is allowed locally (admin exempt)
     final isAllowed = await bindingService.isIdentifierAllowed(identifier);
     if (!isAllowed) {
       final bound = await bindingService.getBoundAccount();
       final name = bound?.displayName ?? 'another account';
       return Failure(
         PermissionDeniedException(
-          'This device is permanently registered to "$name". You cannot log in with any other account. To change accounts, please uninstall and reinstall the application.',
+          'This device is registered to "$name". You cannot log in with any other account. To change accounts, please release the device lock in the Admin Portal.',
         ),
       );
     }
 
     final result = await ref
         .read(portalAuthRepositoryProvider)
-        .login(identifier: identifier, password: password);
+        .login(
+          identifier: identifier,
+          password: password,
+          deviceId: deviceId,
+          machineFingerprint: Platform.localHostname,
+        );
     final session = result.valueOrNull;
     if (session == null) return Failure(result.errorOrNull!);
 
-    // 2. Session verification: ensure the returned user account matches bound account
-    final isSessionAllowed = await bindingService.isSessionAllowed(
-      userId: session.userId,
-      username: session.username,
-      email: session.email,
-    );
-    if (!isSessionAllowed) {
-      final bound = await bindingService.getBoundAccount();
-      final name = bound?.displayName ?? 'another account';
-      return Failure(
-        PermissionDeniedException(
-          'This device is permanently registered to "$name". You cannot log in with any other account. To change accounts, please uninstall and reinstall the application.',
-        ),
-      );
-    }
+    final isAdmin = session.role == 'admin' || session.username.toLowerCase() == 'admin';
 
-    // 3. First successful login: permanently bind this device to this account
-    final bound = await bindingService.getBoundAccount();
-    if (bound == null && session.userId != null) {
-      await bindingService.bindAccount(
-        userId: session.userId!,
+    // 2. Session verification: ensure the returned user account matches bound account (exempt admin)
+    if (!isAdmin) {
+      final isSessionAllowed = await bindingService.isSessionAllowed(
+        userId: session.userId,
         username: session.username,
         email: session.email,
       );
+      if (!isSessionAllowed) {
+        final bound = await bindingService.getBoundAccount();
+        final name = bound?.displayName ?? 'another account';
+        return Failure(
+          PermissionDeniedException(
+            'This device is registered to "$name". You cannot log in with any other account. To change accounts, please release the device lock in the Admin Portal.',
+          ),
+        );
+      }
+
+      // 3. First successful login: permanently bind this device to this account
+      final bound = await bindingService.getBoundAccount();
+      if (bound == null && session.userId != null) {
+        await bindingService.bindAccount(
+          userId: session.userId!,
+          username: session.username,
+          email: session.email,
+        );
+      }
     }
 
     final prefs = await SharedPreferences.getInstance();
     await prefs.setString(_tokenPrefsKey, session.token);
     state = AsyncData(session);
-
-    // Auto-sync: bind this machine's deviceId to the logged-in user on the backend
-    if (session.userId != null && session.userId! > 0) {
-      try {
-        await DeviceIdentityService().registerDeviceOnServer(
-          userId: session.userId,
-        );
-      } catch (_) {}
-    }
 
     return const Success(null);
   }

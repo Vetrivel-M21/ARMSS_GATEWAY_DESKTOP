@@ -35,30 +35,15 @@ class _MisAppState extends ConsumerState<MisApp> {
       final update = await AppUpdateService().check();
       if (update == null) return;
       final navContext = appNavigatorKey.currentContext;
-      if (navContext == null) return;
+      if (navContext == null || !navContext.mounted) return;
 
-      final install = await showDialog<bool>(
-        context: navContext,
-        barrierDismissible: false,
-        builder: (dialogContext) => AlertDialog(
-          title: const Text('Update available'),
-          content: Text(
-            'ARMSS Gateway ${update.version} is available. Update now?',
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(dialogContext, false),
-              child: const Text('Later'),
-            ),
-            FilledButton(
-              onPressed: () => Navigator.pop(dialogContext, true),
-              child: const Text('Update'),
-            ),
-          ],
-        ),
+      final currentVer = await getCurrentAppVersion();
+      if (!navContext.mounted) return;
+      await showDesktopUpdateDialog(
+        navContext,
+        updateInfo: update,
+        currentVersion: currentVer,
       );
-      if (install != true) return;
-      await AppUpdateService().install(update);
     } catch (e) {
       debugPrint('[APP_UPDATE_ERROR] Failed to check or show update dialog: $e');
     }

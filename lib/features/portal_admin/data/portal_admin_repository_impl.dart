@@ -172,6 +172,7 @@ class PortalAdminRepositoryImpl implements PortalAdminRepository {
             department: u['department'] as String? ?? '',
             branch: u['branch'] as String? ?? '',
             role: u['role'] as String? ?? 'user',
+            boundDeviceId: (u['bound_device_id'] as String?) ?? '',
             isActive: u['is_active'] as bool,
             grantedLinkKeys: (u['granted_link_keys'] as List? ?? [])
                 .cast<String>(),
@@ -354,6 +355,32 @@ class PortalAdminRepositoryImpl implements PortalAdminRepository {
       if (body['success'] != true) {
         final msg =
             body['error']?['message'] as String? ?? 'Unable to delete user.';
+        return Failure(NetworkException(msg));
+      }
+      return const Success(null);
+    } on SocketException {
+      return const Failure(
+        NetworkException('Could not reach the ARMSS Gateway server.'),
+      );
+    } on TimeoutException {
+      return const Failure(
+        NetworkException('Timed out contacting the ARMSS Gateway server.'),
+      );
+    } catch (e) {
+      return Failure(NetworkException('Unexpected error: $e'));
+    }
+  }
+
+  @override
+  Future<Result<void>> releaseDeviceLock(int userId) async {
+    try {
+      final response = await http
+          .post(_uri('/portal/admin/users/$userId/release-device'), headers: _headers)
+          .timeout(const Duration(seconds: 10));
+      final body = jsonDecode(response.body) as Map<String, dynamic>;
+      if (body['success'] != true) {
+        final msg =
+            body['error']?['message'] as String? ?? 'Unable to release device lock.';
         return Failure(NetworkException(msg));
       }
       return const Success(null);

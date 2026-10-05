@@ -5,6 +5,7 @@ import '../../../../core/device_auth/device_token_repository.dart';
 
 class DeviceAccessState {
   final bool isRevoked;
+  final bool isOtpReverifyRequired;
   final bool isLoading;
   final String? reason;
   final String deviceId;
@@ -15,6 +16,7 @@ class DeviceAccessState {
 
   const DeviceAccessState({
     this.isRevoked = false,
+    this.isOtpReverifyRequired = false,
     this.isLoading = false,
     this.reason,
     this.deviceId = '',
@@ -26,6 +28,7 @@ class DeviceAccessState {
 
   DeviceAccessState copyWith({
     bool? isRevoked,
+    bool? isOtpReverifyRequired,
     bool? isLoading,
     String? reason,
     String? deviceId,
@@ -36,6 +39,8 @@ class DeviceAccessState {
   }) {
     return DeviceAccessState(
       isRevoked: isRevoked ?? this.isRevoked,
+      isOtpReverifyRequired:
+          isOtpReverifyRequired ?? this.isOtpReverifyRequired,
       isLoading: isLoading ?? this.isLoading,
       reason: reason ?? this.reason,
       deviceId: deviceId ?? this.deviceId,
@@ -65,8 +70,16 @@ class DeviceAccessController extends Notifier<DeviceAccessState> {
 
   /// Validates the device token against the backend and updates revocation state.
   Future<void> checkStatus() async {
-    final identity = await _identityService.getIdentity();
+    var identity = await _identityService.getIdentity();
     final deviceId = await _identityService.getDeviceId();
+
+    // If local token is not yet registered or saved, attempt registration first
+    if (identity == null || identity.token.isEmpty) {
+      final newIdentity = await _identityService.registerDeviceOnServer(deviceId: deviceId);
+      if (newIdentity != null && newIdentity.token.isNotEmpty) {
+        identity = newIdentity;
+      }
+    }
 
     if (identity == null || identity.token.isEmpty) {
       state = state.copyWith(
@@ -86,8 +99,9 @@ class DeviceAccessController extends Notifier<DeviceAccessState> {
 
     if (result.isSuccess &&
         !result.valueOrNull!.isValid &&
-        result.valueOrNull!.reason == 'device_not_found') {
-      final newIdentity = await _identityService.registerDeviceOnServer();
+        (result.valueOrNull!.reason == 'device_not_found' ||
+         result.valueOrNull!.reason == 'missing_device_id_or_token')) {
+      final newIdentity = await _identityService.registerDeviceOnServer(deviceId: identity.deviceId);
       if (newIdentity != null) {
         result = await _repository.validateToken(
           deviceId: newIdentity.deviceId,
@@ -101,6 +115,7 @@ class DeviceAccessController extends Notifier<DeviceAccessState> {
       if (val.isValid) {
         state = state.copyWith(
           isRevoked: false,
+          isOtpReverifyRequired: false,
           reason: null,
           deviceId: identity.deviceId,
           requestStatus: 'none',
@@ -111,13 +126,32 @@ class DeviceAccessController extends Notifier<DeviceAccessState> {
         return;
       }
 
+      if (val.reason == 'otp_reverification_required') {
+        state = state.copyWith(
+          isRevoked: false,
+          isOtpReverifyRequired: true,
+          reason: 'otp_reverification_required',
+          deviceId: identity.deviceId,
+          message:
+              'Monthly security verification is required. Please verify via email OTP.',
+          lastCheckedAt: DateTime.now(),
+        );
+        return;
+      }
+
       state = state.copyWith(
         isRevoked: true,
+        isOtpReverifyRequired: false,
         reason: val.reason ?? 'revoked_by_admin',
         deviceId: identity.deviceId,
         lastCheckedAt: DateTime.now(),
       );
       await _checkPendingActivation(identity.deviceId);
+    } else {
+      state = state.copyWith(
+        deviceId: identity.deviceId,
+        lastCheckedAt: DateTime.now(),
+      );
     }
   }
 
@@ -259,8 +293,20 @@ class DeviceAccessController extends Notifier<DeviceAccessState> {
 
   /// Directly mark access revoked (e.g. from link launcher rejection).
   void markRevoked({required String reason, required String deviceId}) {
+    if (reason == 'otp_reverification_required') {
+      state = state.copyWith(
+        isRevoked: false,
+        isOtpReverifyRequired: true,
+        reason: reason,
+        deviceId: deviceId,
+        message:
+            'Monthly security verification is required. Please verify via email OTP.',
+      );
+      return;
+    }
     state = state.copyWith(
       isRevoked: true,
+      isOtpReverifyRequired: false,
       reason: reason,
       deviceId: deviceId,
     );
