@@ -66,6 +66,14 @@ class _PortalUsersAdminScreenState extends ConsumerState<PortalUsersAdminScreen>
   String _requestQuery = '';
   String _linkQuery = '';
 
+  bool get _isDark => Theme.of(context).brightness == Brightness.dark;
+  Color get _surfacePanel => _isDark ? AppColors.darkSurfacePanel : AppColors.surfacePanel;
+  Color get _surfaceSunken => _isDark ? AppColors.darkSurfaceSunken : AppColors.surfaceSunken;
+  Color get _lineBorder => _isDark ? AppColors.darkLineHairline : AppColors.lineHairline;
+  Color get _primaryInk => _isDark ? AppColors.darkInkPrimary : AppColors.inkPrimary;
+  Color get _secondaryInk => _isDark ? AppColors.darkInkSecondary : AppColors.inkSecondary;
+  Color get _mutedInk => _isDark ? AppColors.darkInkMuted : AppColors.inkMuted;
+
   @override
   void initState() {
     super.initState();
@@ -828,13 +836,16 @@ class _PortalUsersAdminScreenState extends ConsumerState<PortalUsersAdminScreen>
           ],
         ),
         Container(
-          color: AppColors.surfacePanel,
+          decoration: BoxDecoration(
+            color: _surfacePanel,
+            border: Border(bottom: BorderSide(color: _lineBorder)),
+          ),
           child: TabBar(
             controller: _tabController,
             isScrollable: true,
-            labelColor: AppColors.accentLedger,
-            unselectedLabelColor: AppColors.inkSecondary,
-            indicatorColor: AppColors.accentLedger,
+            labelColor: _isDark ? const Color(0xFF818CF8) : AppColors.accentIndigo,
+            unselectedLabelColor: _secondaryInk,
+            indicatorColor: _isDark ? const Color(0xFF818CF8) : AppColors.accentIndigo,
             tabs: const [
               Tab(
                 icon: Icon(Icons.people_outline, size: 18),
@@ -903,8 +914,10 @@ class _PortalUsersAdminScreenState extends ConsumerState<PortalUsersAdminScreen>
           child: TextField(
             controller: _userSearchCtrl,
             onChanged: (v) => setState(() => _userQuery = v),
+            style: TextStyle(fontSize: 13, color: _primaryInk),
             decoration: InputDecoration(
               hintText: 'Search users by name, username, email, department or branch…',
+              hintStyle: const TextStyle(fontSize: 13, color: AppColors.inkMuted),
               prefixIcon: const Icon(Icons.search, size: 20),
               suffixIcon: _userQuery.isNotEmpty
                   ? IconButton(
@@ -918,9 +931,20 @@ class _PortalUsersAdminScreenState extends ConsumerState<PortalUsersAdminScreen>
                   : null,
               isDense: true,
               contentPadding: const EdgeInsets.symmetric(vertical: 10, horizontal: 14),
-              border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(8),
+                borderSide: BorderSide(color: _lineBorder),
+              ),
+              enabledBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(8),
+                borderSide: BorderSide(color: _lineBorder),
+              ),
+              focusedBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(8),
+                borderSide: const BorderSide(color: AppColors.accentIndigo, width: 1.5),
+              ),
               filled: true,
-              fillColor: AppColors.surfacePanel,
+              fillColor: _surfaceSunken,
             ),
           ),
         ),
@@ -936,9 +960,9 @@ class _PortalUsersAdminScreenState extends ConsumerState<PortalUsersAdminScreen>
         else
           Expanded(
             child: ListView.separated(
-              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
+              padding: const EdgeInsets.fromLTRB(20, 8, 20, AppSpacing.scrollBottomPad),
               itemCount: filtered.length,
-              separatorBuilder: (_, __) => const Divider(height: 1),
+              separatorBuilder: (_, _) => const Divider(height: 1),
               itemBuilder: (context, index) {
                 final user = filtered[index];
                 final isAdmin = user.isAdmin;
@@ -972,7 +996,7 @@ class _PortalUsersAdminScreenState extends ConsumerState<PortalUsersAdminScreen>
                                   ? Icons.admin_panel_settings_rounded
                                   : Icons.person_rounded,
                               size: 13,
-                              color: isAdmin ? AppColors.accentLedger : Colors.grey[700],
+                              color: isAdmin ? AppColors.accentLedger : (_isDark ? Colors.grey.shade400 : Colors.grey[700]),
                             ),
                             const SizedBox(width: 4),
                             Text(
@@ -980,7 +1004,7 @@ class _PortalUsersAdminScreenState extends ConsumerState<PortalUsersAdminScreen>
                               style: TextStyle(
                                 fontSize: 11,
                                 fontWeight: FontWeight.bold,
-                                color: isAdmin ? AppColors.accentLedger : Colors.grey[700],
+                                color: isAdmin ? AppColors.accentLedger : (_isDark ? Colors.grey.shade400 : Colors.grey[700]),
                               ),
                             ),
                           ],
@@ -1000,13 +1024,13 @@ class _PortalUsersAdminScreenState extends ConsumerState<PortalUsersAdminScreen>
                         Row(
                           mainAxisSize: MainAxisSize.min,
                           children: [
-                            const Icon(Icons.devices, size: 13, color: AppColors.inkSecondary),
+                            Icon(Icons.devices, size: 13, color: _secondaryInk),
                             const SizedBox(width: 4),
                             Text(
                               'Device Locked: ${user.boundDeviceId}',
-                              style: const TextStyle(
+                              style: TextStyle(
                                 fontSize: 11,
-                                color: AppColors.inkSecondary,
+                                color: _secondaryInk,
                                 fontStyle: FontStyle.italic,
                               ),
                             ),
@@ -1155,8 +1179,10 @@ class _PortalUsersAdminScreenState extends ConsumerState<PortalUsersAdminScreen>
                 child: TextField(
                   controller: _linkSearchCtrl,
                   onChanged: (v) => setState(() => _linkQuery = v),
+                  style: TextStyle(fontSize: 13, color: _primaryInk),
                   decoration: InputDecoration(
                     hintText: 'Search web apps by name, tab, URL or key…',
+                    hintStyle: const TextStyle(fontSize: 13, color: AppColors.inkMuted),
                     prefixIcon: const Icon(Icons.search, size: 20),
                     suffixIcon: _linkQuery.isNotEmpty
                         ? IconButton(
@@ -1175,9 +1201,18 @@ class _PortalUsersAdminScreenState extends ConsumerState<PortalUsersAdminScreen>
                     ),
                     border: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(8),
+                      borderSide: BorderSide(color: _lineBorder),
+                    ),
+                    enabledBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(8),
+                      borderSide: BorderSide(color: _lineBorder),
+                    ),
+                    focusedBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(8),
+                      borderSide: const BorderSide(color: AppColors.accentIndigo, width: 1.5),
                     ),
                     filled: true,
-                    fillColor: AppColors.surfacePanel,
+                    fillColor: _surfaceSunken,
                   ),
                 ),
               ),
@@ -1197,16 +1232,16 @@ class _PortalUsersAdminScreenState extends ConsumerState<PortalUsersAdminScreen>
                 lq.isEmpty
                     ? 'No web apps registered yet.'
                     : 'No web apps match "$lq".',
-                style: const TextStyle(color: AppColors.inkSecondary),
+                style: TextStyle(color: _secondaryInk),
               ),
             ),
           )
         else
           Expanded(
             child: ListView.separated(
-              padding: const EdgeInsets.all(20),
+              padding: const EdgeInsets.fromLTRB(20, 12, 20, AppSpacing.scrollBottomPad),
               itemCount: filteredLinks.length,
-              separatorBuilder: (_, __) => const Divider(height: 1),
+              separatorBuilder: (_, _) => const Divider(height: 1),
               itemBuilder: (_, index) {
                 final link = filteredLinks[index];
                 return ListTile(
@@ -1269,8 +1304,10 @@ class _PortalUsersAdminScreenState extends ConsumerState<PortalUsersAdminScreen>
           child: TextField(
             controller: _deviceSearchCtrl,
             onChanged: (v) => setState(() => _deviceQuery = v),
+            style: TextStyle(fontSize: 13, color: _primaryInk),
             decoration: InputDecoration(
               hintText: 'Search devices by user name, username, email or device ID…',
+              hintStyle: const TextStyle(fontSize: 13, color: AppColors.inkMuted),
               prefixIcon: const Icon(Icons.search, size: 20),
               suffixIcon: _deviceQuery.isNotEmpty
                   ? IconButton(
@@ -1284,15 +1321,26 @@ class _PortalUsersAdminScreenState extends ConsumerState<PortalUsersAdminScreen>
                   : null,
               isDense: true,
               contentPadding: const EdgeInsets.symmetric(vertical: 10, horizontal: 14),
-              border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(8),
+                borderSide: BorderSide(color: _lineBorder),
+              ),
+              enabledBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(8),
+                borderSide: BorderSide(color: _lineBorder),
+              ),
+              focusedBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(8),
+                borderSide: const BorderSide(color: AppColors.accentIndigo, width: 1.5),
+              ),
               filled: true,
-              fillColor: AppColors.surfacePanel,
+              fillColor: _surfaceSunken,
             ),
           ),
         ),
         Expanded(
           child: ListView(
-            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+            padding: const EdgeInsets.fromLTRB(20, 12, 20, AppSpacing.scrollBottomPad),
             children: [
         if (currentSession != null) ...[
           Container(
@@ -1319,30 +1367,31 @@ class _PortalUsersAdminScreenState extends ConsumerState<PortalUsersAdminScreen>
                     children: [
                       Text(
                         'Current Active Session: ${currentSession.fullName} (@${currentSession.username})',
-                        style: const TextStyle(
+                        style: TextStyle(
                           fontWeight: FontWeight.w600,
                           fontSize: 13,
+                          color: _primaryInk,
                         ),
                       ),
                       Text(
                         'Logged-in Email: ${currentSession.email}',
-                        style: const TextStyle(
+                        style: TextStyle(
                           fontSize: 12,
-                          color: AppColors.inkSecondary,
+                          color: _secondaryInk,
                         ),
                       ),
                       Text(
                         'Department: ${currentSession.department}',
-                        style: const TextStyle(
+                        style: TextStyle(
                           fontSize: 12,
-                          color: AppColors.inkSecondary,
+                          color: _secondaryInk,
                         ),
                       ),
                       Text(
                         'Branch: ${currentSession.branch}',
-                        style: const TextStyle(
+                        style: TextStyle(
                           fontSize: 12,
-                          color: AppColors.inkSecondary,
+                          color: _secondaryInk,
                         ),
                       ),
                     ],
@@ -1369,11 +1418,12 @@ class _PortalUsersAdminScreenState extends ConsumerState<PortalUsersAdminScreen>
                       : 'User #${device.userId}');
 
             return Card(
+              color: _surfacePanel,
               margin: const EdgeInsets.only(bottom: 12),
               elevation: 0,
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(8),
-                side: const BorderSide(color: AppColors.lineHairline),
+                side: BorderSide(color: _lineBorder),
               ),
               child: Padding(
                 padding: const EdgeInsets.all(16),
@@ -1405,9 +1455,10 @@ class _PortalUsersAdminScreenState extends ConsumerState<PortalUsersAdminScreen>
                             children: [
                               Text(
                                 displayName,
-                                style: const TextStyle(
+                                style: TextStyle(
                                   fontWeight: FontWeight.w600,
                                   fontSize: 15,
+                                  color: _primaryInk,
                                 ),
                               ),
                               const SizedBox(width: 8),
@@ -1418,13 +1469,13 @@ class _PortalUsersAdminScreenState extends ConsumerState<PortalUsersAdminScreen>
                                 ),
                                 decoration: BoxDecoration(
                                   color: isActive
-                                      ? Colors.green.shade50
-                                      : Colors.red.shade50,
+                                      ? (_isDark ? const Color(0xFF052E16) : Colors.green.shade50)
+                                      : (_isDark ? const Color(0xFF450A0A) : Colors.red.shade50),
                                   borderRadius: BorderRadius.circular(4),
                                   border: Border.all(
                                     color: isActive
-                                        ? Colors.green.shade200
-                                        : Colors.red.shade200,
+                                        ? (_isDark ? const Color(0xFF166534) : Colors.green.shade200)
+                                        : (_isDark ? const Color(0xFF991B1B) : Colors.red.shade200),
                                   ),
                                 ),
                                 child: Text(
@@ -1433,17 +1484,17 @@ class _PortalUsersAdminScreenState extends ConsumerState<PortalUsersAdminScreen>
                                     fontSize: 10,
                                     fontWeight: FontWeight.bold,
                                     color: isActive
-                                        ? Colors.green.shade800
-                                        : Colors.red.shade800,
+                                        ? (_isDark ? const Color(0xFF86EFAC) : Colors.green.shade800)
+                                        : (_isDark ? const Color(0xFFFCA5A5) : Colors.red.shade800),
                                   ),
                                 ),
                               ),
                               const SizedBox(width: 6),
                               Text(
                                 'Token v${device.tokenVersion}',
-                                style: const TextStyle(
+                                style: TextStyle(
                                   fontSize: 11,
-                                  color: AppColors.inkMuted,
+                                  color: _mutedInk,
                                 ),
                               ),
                             ],
@@ -1455,25 +1506,25 @@ class _PortalUsersAdminScreenState extends ConsumerState<PortalUsersAdminScreen>
                             children: [
                               Text(
                                 'Login User: ${device.username.isNotEmpty ? device.username : "admin"} (ID: #${device.userId})',
-                                style: const TextStyle(
+                                style: TextStyle(
                                   fontSize: 12,
-                                  fontWeight: FontWeight.w500,
-                                  color: AppColors.inkPrimary,
+                                  fontWeight: FontWeight.w600,
+                                  color: _primaryInk,
                                 ),
                               ),
                               if (device.email.isNotEmpty)
                                 Text(
                                   'Email: ${device.email}',
-                                  style: const TextStyle(
+                                  style: TextStyle(
                                     fontSize: 12,
-                                    color: AppColors.inkSecondary,
+                                    color: _secondaryInk,
                                   ),
                                 ),
                               Text(
                                 'Machine: ${device.machineFingerprint.isNotEmpty ? device.machineFingerprint : "Windows PC"}',
-                                style: const TextStyle(
+                                style: TextStyle(
                                   fontSize: 12,
-                                  color: AppColors.inkSecondary,
+                                  color: _secondaryInk,
                                 ),
                               ),
                             ],
@@ -1481,10 +1532,10 @@ class _PortalUsersAdminScreenState extends ConsumerState<PortalUsersAdminScreen>
                           const SizedBox(height: 4),
                           Text(
                             'Device ID: ${device.deviceId}',
-                            style: const TextStyle(
+                            style: TextStyle(
                               fontSize: 11,
                               fontFamily: 'IBM Plex Mono',
-                              color: AppColors.inkMuted,
+                              color: _mutedInk,
                             ),
                           ),
                           const SizedBox(height: 4),
@@ -1506,15 +1557,15 @@ class _PortalUsersAdminScreenState extends ConsumerState<PortalUsersAdminScreen>
                                   fontSize: 11,
                                   color: device.isOtpExpired
                                       ? AppColors.signalAmber
-                                      : AppColors.inkSecondary,
+                                      : (_isDark ? const Color(0xFF86EFAC) : AppColors.signalCredit),
                                 ),
                               ),
                               const SizedBox(width: 12),
                               Text(
                                 'Registered: ${dateFormat.format(device.createdAt.toLocal())}',
-                                style: const TextStyle(
+                                style: TextStyle(
                                   fontSize: 11,
-                                  color: AppColors.inkMuted,
+                                  color: _mutedInk,
                                 ),
                               ),
                             ],
@@ -1525,8 +1576,8 @@ class _PortalUsersAdminScreenState extends ConsumerState<PortalUsersAdminScreen>
                     const SizedBox(width: 8),
                     OutlinedButton.icon(
                       style: OutlinedButton.styleFrom(
-                        foregroundColor: AppColors.inkPrimary,
-                        side: const BorderSide(color: AppColors.lineHairline),
+                        foregroundColor: _primaryInk,
+                        side: BorderSide(color: _lineBorder),
                       ),
                       onPressed: () => _assignDeviceUser(device),
                       icon: const Icon(Icons.person_pin_outlined, size: 16),
@@ -1550,14 +1601,15 @@ class _PortalUsersAdminScreenState extends ConsumerState<PortalUsersAdminScreen>
                           vertical: 6,
                         ),
                         decoration: BoxDecoration(
-                          color: Colors.grey.shade100,
+                          color: _surfaceSunken,
                           borderRadius: BorderRadius.circular(6),
+                          border: Border.all(color: _lineBorder),
                         ),
-                        child: const Text(
+                        child: Text(
                           'Revoked',
                           style: TextStyle(
                             fontSize: 12,
-                            color: AppColors.inkMuted,
+                            color: _mutedInk,
                             fontWeight: FontWeight.w600,
                           ),
                         ),
@@ -1631,9 +1683,18 @@ class _PortalUsersAdminScreenState extends ConsumerState<PortalUsersAdminScreen>
               ),
               border: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(8),
+                borderSide: BorderSide(color: _lineBorder),
+              ),
+              enabledBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(8),
+                borderSide: BorderSide(color: _lineBorder),
+              ),
+              focusedBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(8),
+                borderSide: const BorderSide(color: AppColors.accentIndigo, width: 1.5),
               ),
               filled: true,
-              fillColor: AppColors.surfacePanel,
+              fillColor: _surfaceSunken,
             ),
           ),
         ),
@@ -1651,7 +1712,7 @@ class _PortalUsersAdminScreenState extends ConsumerState<PortalUsersAdminScreen>
         else
           Expanded(
             child: ListView.separated(
-              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+              padding: const EdgeInsets.fromLTRB(20, 16, 20, AppSpacing.scrollBottomPad),
               itemCount: filteredRequests.length,
               separatorBuilder: (_, _) => const Divider(height: 1),
               itemBuilder: (context, index) {
@@ -1863,16 +1924,16 @@ class _PortalUsersAdminScreenState extends ConsumerState<PortalUsersAdminScreen>
       children: [
         Container(
           padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
-          color: AppColors.surfacePanel,
+          color: _surfacePanel,
           child: Row(
             children: [
               Container(
                 height: 38,
                 padding: const EdgeInsets.symmetric(horizontal: 10),
                 decoration: BoxDecoration(
-                  color: AppColors.surfaceSunken,
+                  color: _surfaceSunken,
                   borderRadius: BorderRadius.circular(8),
-                  border: Border.all(color: AppColors.lineHairline),
+                  border: Border.all(color: _lineBorder),
                 ),
                 child: DropdownButtonHideUnderline(
                   child: DropdownButton<int?>(
@@ -1996,10 +2057,7 @@ class _PortalUsersAdminScreenState extends ConsumerState<PortalUsersAdminScreen>
                   ),
                 )
               : ListView.separated(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 20,
-                    vertical: 16,
-                  ),
+                  padding: const EdgeInsets.fromLTRB(20, 16, 20, AppSpacing.scrollBottomPad),
                   itemCount: filteredLogs.length,
                   separatorBuilder: (_, _) => const Divider(height: 1),
                   itemBuilder: (context, index) {

@@ -6,6 +6,7 @@ import 'di/providers.dart';
 import '../core/constants/permission_keys.dart';
 import '../core/rbac/current_user_provider.dart';
 import '../core/theme/app_theme.dart';
+import '../core/theme/theme_mode_provider.dart';
 import '../features/dinesh_portal/presentation/screens/dinesh_portal_screen.dart';
 import '../features/kavi_manju_portal/presentation/screens/kavi_manju_portal_screen.dart';
 import '../features/other_portals/presentation/screens/other_portals_screen.dart';
@@ -21,7 +22,7 @@ import '../core/portal_links/portal_link_catalog_repository.dart';
 import '../shared_widgets/app_nav_rail.dart';
 import '../shared_widgets/app_footer.dart';
 import '../shared_widgets/change_password_dialog.dart';
-import '../shared_widgets/page_header.dart';
+import '../core/updates/app_update_service.dart';
 import '../features/profile/presentation/screens/user_profile_screen.dart';
 import '../shared_widgets/portal_link_grid.dart';
 import '../shared_widgets/status_badge.dart';
@@ -31,11 +32,13 @@ class _NavEntry {
   final String label;
   final IconData icon;
   final Widget screen;
+  final String section;
   const _NavEntry({
     required this.key,
     required this.label,
     required this.icon,
     required this.screen,
+    this.section = 'WORKSPACE',
   });
 }
 
@@ -88,31 +91,35 @@ class _AppShellState extends ConsumerState<AppShell> {
       }
     }
 
-    // For admin users, show the named portals as configured along with admin tools.
+    // For admin users, organize into two labeled sections: WORKSPACE and ADMINISTRATION
     return <_NavEntry>[
       const _NavEntry(
         key: 'other_portals',
         label: 'Abi Portal',
         icon: Icons.apps_outlined,
         screen: OtherPortalsScreen(),
+        section: 'WORKSPACE',
       ),
       const _NavEntry(
         key: 'kavi_manju_portal',
         label: 'Kavi Manju Portal',
         icon: Icons.apps_outlined,
         screen: KaviManjuPortalScreen(),
+        section: 'WORKSPACE',
       ),
       const _NavEntry(
         key: 'vetri_portal',
         label: 'Vetri Portal',
         icon: Icons.apps_outlined,
         screen: VetriPortalScreen(),
+        section: 'WORKSPACE',
       ),
       const _NavEntry(
         key: 'dinesh_portal',
         label: 'Dinesh Portal',
         icon: Icons.apps_outlined,
         screen: DineshPortalScreen(),
+        section: 'WORKSPACE',
       ),
       for (final tab in customTabs)
         _NavEntry(
@@ -120,18 +127,21 @@ class _AppShellState extends ConsumerState<AppShell> {
           label: tab,
           icon: Icons.apps_outlined,
           screen: GenericPortalScreen(tabName: tab),
+          section: 'WORKSPACE',
         ),
       const _NavEntry(
         key: 'portal_users',
         label: 'Portal Users',
         icon: Icons.admin_panel_settings_outlined,
         screen: PortalUsersAdminScreen(),
+        section: 'ADMINISTRATION',
       ),
       const _NavEntry(
         key: 'audit_logs',
         label: 'Audit Logs',
         icon: Icons.history_outlined,
         screen: AdminAuditLogsScreen(),
+        section: 'ADMINISTRATION',
       ),
     ];
   }
@@ -141,6 +151,9 @@ class _AppShellState extends ConsumerState<AppShell> {
     final entries = _buildEntries();
     final selectedIndex = _selectedIndex < entries.length ? _selectedIndex : 0;
     final activeKey = entries[selectedIndex].key;
+
+    final portalSession = ref.watch(portalSessionControllerProvider).valueOrNull;
+    final isAdmin = portalSession?.isAdmin ?? false;
 
     return CallbackShortcuts(
       bindings: {
@@ -158,14 +171,20 @@ class _AppShellState extends ConsumerState<AppShell> {
               Expanded(
                 child: Row(
                   children: [
-                    AppNavRail(
-                      items: [
-                        for (final e in entries)
-                          AppNavRailItem(icon: e.icon, label: e.label),
-                      ],
-                      selectedIndex: selectedIndex,
-                      onSelect: (i) => setState(() => _selectedIndex = i),
-                    ),
+                    // Sidebar is only shown for Administrator users; Portal Users get a full-width experience
+                    if (isAdmin)
+                      AppNavRail(
+                        items: [
+                          for (final e in entries)
+                            AppNavRailItem(
+                              icon: e.icon,
+                              label: e.label,
+                              section: e.section,
+                            ),
+                        ],
+                        selectedIndex: selectedIndex,
+                        onSelect: (i) => setState(() => _selectedIndex = i),
+                      ),
                     Expanded(child: entries[selectedIndex].screen),
                   ],
                 ),
@@ -176,6 +195,46 @@ class _AppShellState extends ConsumerState<AppShell> {
         ),
       ),
     );
+  }
+}
+
+Future<void> _triggerAppUpdateCheck(BuildContext context) async {
+  try {
+    final currentVer = await getCurrentAppVersion();
+    final update = await AppUpdateService().check();
+    if (!context.mounted) return;
+    if (update != null) {
+      await showDesktopUpdateDialog(
+        context,
+        updateInfo: update,
+        currentVersion: currentVer,
+      );
+    } else {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Row(
+            children: [
+              const Icon(Icons.check_circle_rounded, color: Colors.white, size: 18),
+              const SizedBox(width: 8),
+              Text('ARMSS Gateway is up to date (v$currentVer)'),
+            ],
+          ),
+          backgroundColor: const Color(0xFF10B981),
+          behavior: SnackBarBehavior.floating,
+          duration: const Duration(seconds: 3),
+        ),
+      );
+    }
+  } catch (e) {
+    if (context.mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Update check failed: $e'),
+          backgroundColor: Colors.red.shade700,
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+    }
   }
 }
 
@@ -228,18 +287,28 @@ class _TopBar extends ConsumerWidget {
         ? 'Administrator'
         : (localUser?.roleName ?? (portalSession != null ? 'Portal User' : 'User'));
 
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final primaryInk = isDark ? AppColors.darkInkPrimary : AppColors.inkPrimary;
+    final secondaryInk = isDark ? AppColors.darkInkSecondary : AppColors.inkSecondary;
+
     return Container(
       height: 56,
       padding: const EdgeInsets.symmetric(horizontal: AppSpacing.lg),
       decoration: BoxDecoration(
-        color: AppColors.surfacePanel,
-        boxShadow: AppColors.softShadow(opacity: 0.04),
+        color: isDark ? AppColors.darkSurfacePanel : AppColors.surfacePanel,
+        boxShadow: isDark ? null : AppColors.softShadow(opacity: 0.04),
+        border: Border(
+          bottom: BorderSide(
+            color: isDark ? AppColors.darkLineHairline : AppColors.lineHairline,
+            width: 1,
+          ),
+        ),
       ),
       child: Row(
         children: [
           Image.asset('assets/images/app_logo_mark.png', height: 32),
           const SizedBox(width: AppSpacing.md),
-          _welcomeBadge(username),
+          _welcomeBadge(username, isDark),
           const SizedBox(width: AppSpacing.sm),
           if (activeKey == 'balance_entry') const _DayStatusBadge(),
           const Spacer(),
@@ -255,23 +324,33 @@ class _TopBar extends ConsumerWidget {
               child: Row(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  const Icon(Icons.account_circle_outlined, size: 20, color: AppColors.inkPrimary),
+                  Icon(Icons.account_circle_outlined, size: 20, color: primaryInk),
                   const SizedBox(width: 6),
                   Text(
                     displayName,
-                    style: const TextStyle(
+                    style: TextStyle(
                       fontSize: 13,
                       fontWeight: FontWeight.w600,
-                      color: AppColors.inkPrimary,
+                      color: primaryInk,
                     ),
                   ),
                   const SizedBox(width: AppSpacing.sm),
-                  _roleBadge(roleName),
+                  _roleBadge(roleName, isDark),
                 ],
               ),
             ),
           ),
-          const SizedBox(width: AppSpacing.sm),
+          const SizedBox(width: AppSpacing.xs),
+          IconButton(
+            icon: Icon(
+              isDark ? Icons.light_mode_rounded : Icons.dark_mode_rounded,
+              size: 20,
+              color: isDark ? const Color(0xFFFBBF24) : secondaryInk,
+            ),
+            tooltip: isDark ? 'Switch to Light Theme' : 'Switch to Dark Theme',
+            onPressed: () => ref.read(themeModeProvider.notifier).toggleTheme(),
+          ),
+          const SizedBox(width: AppSpacing.xs),
           IconButton(
             icon: const Icon(Icons.manage_accounts_outlined, size: 21),
             tooltip: 'User Profile & Security',
@@ -280,6 +359,12 @@ class _TopBar extends ConsumerWidget {
                 MaterialPageRoute(builder: (_) => const UserProfileScreen()),
               );
             },
+          ),
+          const SizedBox(width: AppSpacing.xs),
+          IconButton(
+            icon: const Icon(Icons.cloud_download_outlined, size: 20),
+            tooltip: 'Check for Updates',
+            onPressed: () => _triggerAppUpdateCheck(context),
           ),
           const SizedBox(width: AppSpacing.xs),
           IconButton(
@@ -301,27 +386,30 @@ class _TopBar extends ConsumerWidget {
     );
   }
 
-  Widget _welcomeBadge(String username) {
+  Widget _welcomeBadge(String username, bool isDark) {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 5),
       decoration: BoxDecoration(
-        color: AppColors.surfaceSunken,
+        color: isDark ? AppColors.darkSurfaceSunken : AppColors.surfaceSunken,
         borderRadius: BorderRadius.circular(999),
+        border: Border.all(
+          color: isDark ? AppColors.darkLineHairline : Colors.transparent,
+        ),
       ),
       child: Text.rich(
         TextSpan(
           text: 'Welcome, ',
-          style: const TextStyle(
+          style: TextStyle(
             fontSize: 12,
-            color: AppColors.inkSecondary,
+            color: isDark ? AppColors.darkInkSecondary : AppColors.inkSecondary,
             fontWeight: FontWeight.w500,
           ),
           children: [
             TextSpan(
               text: username,
-              style: const TextStyle(
+              style: TextStyle(
                 fontSize: 12,
-                color: AppColors.inkPrimary,
+                color: isDark ? AppColors.darkInkPrimary : AppColors.inkPrimary,
                 fontWeight: FontWeight.w600,
               ),
             ),
@@ -331,19 +419,26 @@ class _TopBar extends ConsumerWidget {
     );
   }
 
-  Widget _roleBadge(String roleName) {
+  Widget _roleBadge(String roleName, bool isDark) {
     final isAdmin = RoleName.isAdminOrSuper(roleName);
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
       decoration: BoxDecoration(
-        color: isAdmin ? AppColors.inkPrimary : AppColors.accentLedgerTint,
+        color: isAdmin
+            ? (isDark ? const Color(0xFF312E81) : AppColors.inkPrimary)
+            : (isDark ? const Color(0xFF1E1B4B) : AppColors.accentLedgerTint),
         borderRadius: BorderRadius.circular(999),
+        border: Border.all(
+          color: isDark ? AppColors.accentIndigo.withValues(alpha: 0.3) : Colors.transparent,
+        ),
       ),
       child: Text(
         roleName,
         style: TextStyle(
           fontSize: 11,
-          color: isAdmin ? Colors.white : AppColors.accentLedger,
+          color: isAdmin
+              ? (isDark ? const Color(0xFFC7D2FE) : Colors.white)
+              : (isDark ? const Color(0xFFA5B4FC) : AppColors.accentLedger),
           fontWeight: FontWeight.w600,
         ),
       ),
@@ -397,24 +492,13 @@ class GenericPortalScreen extends ConsumerWidget {
         ? matchingLinks
         : matchingLinks.where((l) => grantedKeys.contains(l.key)).toList();
 
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        PageHeader(
-          title: tabName,
+    return PortalCategoryListView(
+      portalTitle: tabName,
+      categories: [
+        PortalCategory(
+          name: tabName,
           icon: Icons.apps_outlined,
-          accentColor: const Color(0xFF0284C7),
-        ),
-        Expanded(
-          child: PortalCategoryListView(
-            categories: [
-              PortalCategory(
-                name: tabName,
-                icon: Icons.apps_outlined,
-                links: visibleLinks,
-              ),
-            ],
-          ),
+          links: visibleLinks,
         ),
       ],
     );

@@ -58,11 +58,11 @@ Future<String> getCurrentAppVersion() async {
     }
   } catch (_) {}
 
-  return '1.1.10';
+  return '1.1.13';
 }
 
 /// For synchronous compatibility where currentAppVersion is referenced
-String get currentAppVersion => _cachedAppVersion ?? '1.1.10';
+String get currentAppVersion => _cachedAppVersion ?? '1.1.13';
 
 class AppUpdateInfo {
   final String version;
@@ -103,35 +103,68 @@ class AppUpdateService {
     }
   }
 
-  Future<void> install(AppUpdateInfo update, {void Function(String status)? onStatus}) async {
-    onStatus?.call('Downloading update package...');
-    final response = await http
-        .get(Uri.parse(update.url))
-        .timeout(const Duration(minutes: 5));
-    if (response.statusCode != 200) {
-      throw const HttpException('Unable to download the update from server.');
-    }
-    final bytes = response.bodyBytes;
-    if (update.sha256.isNotEmpty) {
-      onStatus?.call('Verifying package integrity...');
-      if (sha256.convert(bytes).toString().toLowerCase() !=
-          update.sha256.toLowerCase()) {
-        throw const HttpException(
-          'The downloaded update failed its integrity checksum.',
-        );
+  Future<void> install(
+    AppUpdateInfo update, {
+    void Function(String status)? onStatus,
+    void Function(double progress, int receivedBytes, int totalBytes)? onProgress,
+  }) async {
+    final client = http.Client();
+    File? installer;
+    try {
+      onStatus?.call('Connecting to update server...');
+      final request = http.Request('GET', Uri.parse(update.url));
+      final response = await client.send(request).timeout(const Duration(minutes: 5));
+      if (response.statusCode != 200) {
+        throw HttpException('Unable to download update (HTTP ${response.statusCode}).');
       }
+
+      final totalBytes = response.contentLength ?? 0;
+      int receivedBytes = 0;
+      final directory = await getTemporaryDirectory();
+      installer = File(
+        '${directory.path}\\ARMSS_Gateway_Setup_${update.version}.exe',
+      );
+      if (await installer.exists()) {
+        try {
+          await installer.delete();
+        } catch (_) {}
+      }
+
+      final sink = installer.openWrite();
+      onStatus?.call('Downloading update package...');
+
+      await for (final chunk in response.stream) {
+        sink.add(chunk);
+        receivedBytes += chunk.length;
+        if (totalBytes > 0) {
+          final progress = receivedBytes / totalBytes;
+          onProgress?.call(progress.clamp(0.0, 1.0), receivedBytes, totalBytes);
+        } else {
+          onProgress?.call(-1.0, receivedBytes, 0);
+        }
+      }
+      await sink.flush();
+      await sink.close();
+
+      if (update.sha256.isNotEmpty) {
+        onStatus?.call('Verifying package integrity...');
+        final fileDigest = await sha256.bind(installer.openRead()).first;
+        if (fileDigest.toString().toLowerCase() != update.sha256.toLowerCase()) {
+          try {
+            await installer.delete();
+          } catch (_) {}
+          throw const HttpException('The downloaded update failed its integrity checksum.');
+        }
+      }
+
+      onStatus?.call('Launching update installer...');
+      await Process.start(installer.path, [
+        '/UPDATE',
+      ], mode: ProcessStartMode.detached);
+      exit(0);
+    } finally {
+      client.close();
     }
-    onStatus?.call('Preparing installer...');
-    final directory = await getTemporaryDirectory();
-    final installer = File(
-      '${directory.path}\\ARMSS_Gateway_Setup_${update.version}.exe',
-    );
-    await installer.writeAsBytes(bytes, flush: true);
-    onStatus?.call('Launching update...');
-    await Process.start(installer.path, [
-      '/UPDATE',
-    ], mode: ProcessStartMode.detached);
-    exit(0);
   }
 }
 
@@ -181,6 +214,9 @@ class _DesktopUpdateDialog extends StatefulWidget {
 class _DesktopUpdateDialogState extends State<_DesktopUpdateDialog> {
   bool _isInstalling = false;
   String _statusText = '';
+  double _progress = 0.0;
+  int _receivedBytes = 0;
+  int _totalBytes = 0;
   String? _error;
 
   Future<void> _startInstall() async {
@@ -188,12 +224,24 @@ class _DesktopUpdateDialogState extends State<_DesktopUpdateDialog> {
       _isInstalling = true;
       _error = null;
       _statusText = 'Connecting to server...';
+      _progress = 0.0;
+      _receivedBytes = 0;
+      _totalBytes = 0;
     });
     try {
       await AppUpdateService().install(
         widget.updateInfo,
         onStatus: (status) {
           if (mounted) setState(() => _statusText = status);
+        },
+        onProgress: (progress, received, total) {
+          if (mounted) {
+            setState(() {
+              _progress = progress;
+              _receivedBytes = received;
+              _totalBytes = total;
+            });
+          }
         },
       );
     } catch (e) {
@@ -214,7 +262,7 @@ class _DesktopUpdateDialogState extends State<_DesktopUpdateDialog> {
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
         titlePadding: const EdgeInsets.fromLTRB(24, 24, 24, 12),
         contentPadding: const EdgeInsets.symmetric(horizontal: 24, vertical: 8),
-        actionsPadding: const EdgeInsets.fromLTRB(24, 12, 24, 20),
+        actionsPadding: const EdgeInsets.fromLTRB(24, 16, 24, 20),
         title: Row(
           children: [
             Container(
@@ -295,23 +343,57 @@ class _DesktopUpdateDialogState extends State<_DesktopUpdateDialog> {
                 style: TextStyle(fontSize: 13, color: AppColors.inkSecondary, height: 1.4),
               ),
             if (_isInstalling) ...[
-              const SizedBox(height: 8),
+              const SizedBox(height: 4),
               Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  const SizedBox(
-                    width: 18,
-                    height: 18,
-                    child: CircularProgressIndicator(strokeWidth: 2.2),
+                  Row(
+                    children: [
+                      const SizedBox(
+                        width: 14,
+                        height: 14,
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      ),
+                      const SizedBox(width: 8),
+                      Text(
+                        _statusText,
+                        style: const TextStyle(fontSize: 12.5, fontWeight: FontWeight.w600, color: AppColors.inkPrimary),
+                      ),
+                    ],
                   ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: Text(
-                      _statusText,
-                      style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w500),
+                  if (_totalBytes > 0 && _progress >= 0)
+                    Text(
+                      '${(_progress * 100).toStringAsFixed(0)}%',
+                      style: AppTextStyles.monoWith(fontSize: 12.5, fontWeight: FontWeight.w700, color: AppColors.accentLedger),
                     ),
-                  ),
                 ],
               ),
+              const SizedBox(height: 10),
+              ClipRRect(
+                borderRadius: BorderRadius.circular(999),
+                child: LinearProgressIndicator(
+                  value: _progress >= 0 && _totalBytes > 0 ? _progress : null,
+                  minHeight: 8,
+                  backgroundColor: AppColors.lineHairline,
+                  valueColor: const AlwaysStoppedAnimation<Color>(AppColors.accentLedger),
+                ),
+              ),
+              if (_totalBytes > 0) ...[
+                const SizedBox(height: 6),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Text(
+                      '${(_receivedBytes / (1024 * 1024)).toStringAsFixed(1)} MB / ${(_totalBytes / (1024 * 1024)).toStringAsFixed(1)} MB',
+                      style: AppTextStyles.monoWith(fontSize: 11, color: AppColors.inkSecondary),
+                    ),
+                    const Text(
+                      'Please keep the app open',
+                      style: TextStyle(fontSize: 11, color: AppColors.inkMuted),
+                    ),
+                  ],
+                ),
+              ],
             ],
             if (_error != null) ...[
               const SizedBox(height: 8),
@@ -353,7 +435,7 @@ class _DesktopUpdateDialogState extends State<_DesktopUpdateDialog> {
             icon: _isInstalling
                 ? const SizedBox.shrink()
                 : const Icon(Icons.download_rounded, size: 16),
-            label: Text(_isInstalling ? 'Updating...' : (_error != null ? 'Retry' : 'Update Now')),
+            label: Text(_isInstalling ? 'Downloading...' : (_error != null ? 'Retry' : 'Update Now')),
           ),
         ],
       ),

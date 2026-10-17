@@ -138,12 +138,24 @@ class _ChangePasswordDialogState extends ConsumerState<ChangePasswordDialog> {
     final isDefaultAsync = ref.watch(isDefaultAdminPasswordProvider);
     final isDefault = isDefaultAsync.valueOrNull ?? false;
 
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final surfacePanel = isDark ? AppColors.darkSurfacePanel : AppColors.surfacePanel;
+    final primaryInk = isDark ? AppColors.darkInkPrimary : AppColors.inkPrimary;
+    final secondaryInk = isDark ? AppColors.darkInkSecondary : AppColors.inkSecondary;
+    final lineBorder = isDark ? AppColors.darkLineHairline : AppColors.lineHairline;
+
     return Dialog(
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-      clipBehavior: Clip.antiAlias,
+      backgroundColor: Colors.transparent,
+      elevation: 0,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
       child: Container(
         width: 440,
-        color: AppColors.surfacePanel,
+        decoration: BoxDecoration(
+          color: surfacePanel,
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: lineBorder),
+          boxShadow: isDark ? null : AppColors.softShadow(opacity: 0.12),
+        ),
         padding: const EdgeInsets.all(AppSpacing.xl),
         child: Form(
           key: _formKey,
@@ -174,18 +186,18 @@ class _ChangePasswordDialogState extends ConsumerState<ChangePasswordDialog> {
                       children: [
                         Text(
                           'Change Password — $username',
-                          style: const TextStyle(
+                          style: TextStyle(
                             fontSize: 16,
                             fontWeight: FontWeight.bold,
-                            color: AppColors.inkPrimary,
+                            color: primaryInk,
                           ),
                         ),
                         const SizedBox(height: 2),
-                        const Text(
+                        Text(
                           'Update your administrator account credentials',
                           style: TextStyle(
                             fontSize: 12,
-                            color: AppColors.inkSecondary,
+                            color: secondaryInk,
                           ),
                         ),
                       ],

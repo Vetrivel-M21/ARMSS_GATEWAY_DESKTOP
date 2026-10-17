@@ -57,7 +57,15 @@ class _UserProfileScreenState extends ConsumerState<UserProfileScreen> {
   Timer? _cooldownTimer;
 
   bool _isCheckingUpdate = false;
-  String _currentVersionStr = '1.1.10';
+  String _currentVersionStr = '1.1.13';
+
+  bool get _isDark => Theme.of(context).brightness == Brightness.dark;
+  Color get _surfaceCanvas => _isDark ? AppColors.darkSurfaceCanvas : AppColors.surfaceCanvas;
+  Color get _surfacePanel => _isDark ? AppColors.darkSurfacePanel : AppColors.surfacePanel;
+  Color get _surfaceSunken => _isDark ? AppColors.darkSurfaceSunken : AppColors.surfaceSunken;
+  Color get _lineBorder => _isDark ? AppColors.darkLineHairline : AppColors.lineHairline;
+  Color get _primaryInk => _isDark ? AppColors.darkInkPrimary : AppColors.inkPrimary;
+  Color get _secondaryInk => _isDark ? AppColors.darkInkSecondary : AppColors.inkSecondary;
 
   @override
   void initState() {
@@ -480,52 +488,56 @@ class _UserProfileScreenState extends ConsumerState<UserProfileScreen> {
     final canPop = Navigator.of(context).canPop();
 
     return Scaffold(
-      backgroundColor: AppColors.surfaceCanvas,
+      backgroundColor: _surfaceCanvas,
       body: SafeArea(
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Container(
-              color: AppColors.surfacePanel,
+              decoration: BoxDecoration(
+                color: _surfacePanel,
+                border: Border(bottom: BorderSide(color: _lineBorder)),
+              ),
               padding: const EdgeInsets.symmetric(
                 horizontal: AppSpacing.lg,
-                vertical: AppSpacing.sm,
+                vertical: AppSpacing.md,
               ),
               child: Row(
                 children: [
                   if (canPop) ...[
                     IconButton(
-                      icon: const Icon(
+                      icon: Icon(
                         Icons.arrow_back_rounded,
-                        color: AppColors.inkPrimary,
+                        color: _primaryInk,
                       ),
                       tooltip: 'Back',
                       onPressed: () => Navigator.of(context).pop(),
                     ),
                     const SizedBox(width: AppSpacing.sm),
                   ],
-                  const Icon(
+                  Icon(
                     Icons.account_circle_outlined,
-                    color: AppColors.inkPrimary,
+                    color: _primaryInk,
                     size: 28,
                   ),
-                  const SizedBox(width: AppSpacing.sm),
+                  const SizedBox(width: AppSpacing.md),
                   Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      const Text(
+                      Text(
                         'User Profile & Security',
                         style: TextStyle(
                           fontSize: 18,
                           fontWeight: FontWeight.bold,
-                          color: AppColors.inkPrimary,
+                          color: _primaryInk,
                         ),
                       ),
+                      const SizedBox(height: 2),
                       Text(
                         'Manage personal details, branch assignments, and update passwords',
                         style: TextStyle(
                           fontSize: 12,
-                          color: AppColors.inkSecondary,
+                          color: _secondaryInk,
                         ),
                       ),
                     ],
@@ -535,7 +547,12 @@ class _UserProfileScreenState extends ConsumerState<UserProfileScreen> {
             ),
             Expanded(
               child: SingleChildScrollView(
-                padding: const EdgeInsets.all(AppSpacing.xl),
+                padding: const EdgeInsets.fromLTRB(
+                  AppSpacing.xl,
+                  AppSpacing.xl,
+                  AppSpacing.xl,
+                  AppSpacing.scrollBottomPad,
+                ),
                 child: Center(
                   child: ConstrainedBox(
                     constraints: const BoxConstraints(maxWidth: 1000),
@@ -623,10 +640,10 @@ class _UserProfileScreenState extends ConsumerState<UserProfileScreen> {
     return Card(
       elevation: 0,
       shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(12),
-        side: const BorderSide(color: AppColors.lineHairline),
+        borderRadius: BorderRadius.circular(14),
+        side: BorderSide(color: _lineBorder),
       ),
-      color: AppColors.surfacePanel,
+      color: _surfacePanel,
       child: Padding(
         padding: const EdgeInsets.all(AppSpacing.lg),
         child: Column(
@@ -647,13 +664,13 @@ class _UserProfileScreenState extends ConsumerState<UserProfileScreen> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      const Text(
+                      Text(
                         'App Version & Updates',
-                        style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: AppColors.inkPrimary),
+                        style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: _primaryInk),
                       ),
                       Text(
                         'Installed Version: v$_currentVersionStr',
-                        style: const TextStyle(fontSize: 12, color: AppColors.inkSecondary),
+                        style: TextStyle(fontSize: 12, color: _secondaryInk),
                       ),
                     ],
                   ),
@@ -667,7 +684,7 @@ class _UserProfileScreenState extends ConsumerState<UserProfileScreen> {
                 style: OutlinedButton.styleFrom(
                   padding: const EdgeInsets.symmetric(vertical: 11),
                   shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                  side: const BorderSide(color: AppColors.lineHairline),
+                  side: BorderSide(color: _lineBorder),
                 ),
                 icon: _isCheckingUpdate
                     ? const SizedBox(
@@ -694,10 +711,10 @@ class _UserProfileScreenState extends ConsumerState<UserProfileScreen> {
     return Card(
       elevation: 0,
       shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(12),
-        side: const BorderSide(color: AppColors.lineHairline),
+        borderRadius: BorderRadius.circular(14),
+        side: BorderSide(color: _lineBorder),
       ),
-      color: AppColors.surfacePanel,
+      color: _surfacePanel,
       child: Padding(
         padding: const EdgeInsets.all(AppSpacing.xl),
         child: Form(
@@ -709,13 +726,13 @@ class _UserProfileScreenState extends ConsumerState<UserProfileScreen> {
                 children: [
                   CircleAvatar(
                     radius: 28,
-                    backgroundColor: AppColors.inkPrimary,
+                    backgroundColor: _primaryInk,
                     child: Text(
                       username.isNotEmpty ? username[0].toUpperCase() : 'U',
-                      style: const TextStyle(
+                      style: TextStyle(
                         fontSize: 24,
                         fontWeight: FontWeight.bold,
-                        color: Colors.white,
+                        color: _surfacePanel,
                       ),
                     ),
                   ),
@@ -726,10 +743,10 @@ class _UserProfileScreenState extends ConsumerState<UserProfileScreen> {
                       children: [
                         Text(
                           username,
-                          style: const TextStyle(
+                          style: TextStyle(
                             fontSize: 18,
                             fontWeight: FontWeight.bold,
-                            color: AppColors.inkPrimary,
+                            color: _primaryInk,
                           ),
                         ),
                         const SizedBox(height: 4),
@@ -756,44 +773,50 @@ class _UserProfileScreenState extends ConsumerState<UserProfileScreen> {
                   ),
                 ],
               ),
-              const Divider(height: 32),
-              const Text(
+              Divider(height: 32, color: _lineBorder),
+              Text(
                 'Personal & Work Details',
                 style: TextStyle(
                   fontSize: 15,
                   fontWeight: FontWeight.bold,
-                  color: AppColors.inkPrimary,
+                  color: _primaryInk,
                 ),
               ),
               const SizedBox(height: AppSpacing.md),
               TextFormField(
                 controller: _usernameController,
                 readOnly: true,
-                decoration: const InputDecoration(
+                style: TextStyle(color: _primaryInk),
+                decoration: InputDecoration(
                   labelText: 'Username',
-                  prefixIcon: Icon(Icons.person_outline, size: 20),
+                  labelStyle: TextStyle(color: _secondaryInk),
+                  prefixIcon: const Icon(Icons.person_outline, size: 20),
                   suffixIcon: Icon(
                     Icons.lock_outline,
                     size: 16,
-                    color: AppColors.inkSecondary,
+                    color: _secondaryInk,
                   ),
                   helperText: 'Username cannot be changed',
+                  helperStyle: TextStyle(color: _secondaryInk),
                 ),
               ),
               const SizedBox(height: AppSpacing.md),
               TextFormField(
                 controller: _emailController,
                 keyboardType: TextInputType.emailAddress,
-                decoration: const InputDecoration(
+                style: TextStyle(color: _primaryInk),
+                decoration: InputDecoration(
                   labelText: 'Email Address',
-                  prefixIcon: Icon(Icons.alternate_email_rounded, size: 20),
-                  suffixIcon: Icon(
+                  labelStyle: TextStyle(color: _secondaryInk),
+                  prefixIcon: const Icon(Icons.alternate_email_rounded, size: 20),
+                  suffixIcon: const Icon(
                     Icons.verified_user_outlined,
                     size: 16,
                     color: AppColors.signalCredit,
                   ),
                   hintText: 'e.g. user@example.com',
                   helperText: 'Used for system communications and OTP recovery',
+                  helperStyle: TextStyle(color: _secondaryInk),
                 ),
                 validator: (v) {
                   final text = v?.trim() ?? '';
@@ -808,9 +831,11 @@ class _UserProfileScreenState extends ConsumerState<UserProfileScreen> {
               const SizedBox(height: AppSpacing.md),
               TextFormField(
                 controller: _fullNameController,
-                decoration: const InputDecoration(
+                style: TextStyle(color: _primaryInk),
+                decoration: InputDecoration(
                   labelText: 'Full Name',
-                  prefixIcon: Icon(Icons.badge_outlined, size: 20),
+                  labelStyle: TextStyle(color: _secondaryInk),
+                  prefixIcon: const Icon(Icons.badge_outlined, size: 20),
                   hintText: 'e.g. John Doe',
                 ),
                 validator: (v) => (v == null || v.trim().isEmpty)
@@ -820,18 +845,22 @@ class _UserProfileScreenState extends ConsumerState<UserProfileScreen> {
               const SizedBox(height: AppSpacing.md),
               TextFormField(
                 controller: _departmentController,
-                decoration: const InputDecoration(
+                style: TextStyle(color: _primaryInk),
+                decoration: InputDecoration(
                   labelText: 'Department',
-                  prefixIcon: Icon(Icons.apartment_outlined, size: 20),
+                  labelStyle: TextStyle(color: _secondaryInk),
+                  prefixIcon: const Icon(Icons.apartment_outlined, size: 20),
                   hintText: 'e.g. Operations, IT, Finance',
                 ),
               ),
               const SizedBox(height: AppSpacing.md),
               TextFormField(
                 controller: _branchController,
-                decoration: const InputDecoration(
+                style: TextStyle(color: _primaryInk),
+                decoration: InputDecoration(
                   labelText: 'Branch',
-                  prefixIcon: Icon(Icons.location_on_outlined, size: 20),
+                  labelStyle: TextStyle(color: _secondaryInk),
+                  prefixIcon: const Icon(Icons.location_on_outlined, size: 20),
                   hintText: 'e.g. Head Office, Chennai, Madurai',
                 ),
               ),
@@ -869,10 +898,10 @@ class _UserProfileScreenState extends ConsumerState<UserProfileScreen> {
     return Card(
       elevation: 0,
       shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(12),
-        side: const BorderSide(color: AppColors.lineHairline),
+        borderRadius: BorderRadius.circular(14),
+        side: BorderSide(color: _lineBorder),
       ),
-      color: AppColors.surfacePanel,
+      color: _surfacePanel,
       child: Padding(
         padding: const EdgeInsets.all(AppSpacing.xl),
         child: Column(
@@ -880,18 +909,18 @@ class _UserProfileScreenState extends ConsumerState<UserProfileScreen> {
           children: [
             Row(
               children: [
-                const Icon(
+                Icon(
                   Icons.shield_outlined,
-                  color: AppColors.inkPrimary,
+                  color: _primaryInk,
                   size: 24,
                 ),
                 const SizedBox(width: AppSpacing.sm),
-                const Text(
+                Text(
                   'Password & Security',
                   style: TextStyle(
                     fontSize: 16,
                     fontWeight: FontWeight.bold,
-                    color: AppColors.inkPrimary,
+                    color: _primaryInk,
                   ),
                 ),
                 const Spacer(),
@@ -919,15 +948,16 @@ class _UserProfileScreenState extends ConsumerState<UserProfileScreen> {
             const SizedBox(height: 8),
             Text(
               'Select a verification method to securely update your password.',
-              style: TextStyle(fontSize: 12, color: AppColors.inkSecondary),
+              style: TextStyle(fontSize: 12, color: _secondaryInk),
             ),
             const SizedBox(height: AppSpacing.md),
             // Segmented toggle
             Container(
               width: double.infinity,
               decoration: BoxDecoration(
-                color: AppColors.surfaceSunken,
+                color: _surfaceSunken,
                 borderRadius: BorderRadius.circular(8),
+                border: Border.all(color: _lineBorder),
               ),
               padding: const EdgeInsets.all(4),
               child: Row(
@@ -950,7 +980,7 @@ class _UserProfileScreenState extends ConsumerState<UserProfileScreen> {
                 ],
               ),
             ),
-            const Divider(height: 28),
+            Divider(height: 28, color: _lineBorder),
             if (_passwordMethodIndex == 0)
               _buildOldPasswordForm(isAdmin: isAdmin)
             else
@@ -973,9 +1003,9 @@ class _UserProfileScreenState extends ConsumerState<UserProfileScreen> {
       child: Container(
         padding: const EdgeInsets.symmetric(vertical: 8),
         decoration: BoxDecoration(
-          color: isSelected ? AppColors.surfacePanel : Colors.transparent,
+          color: isSelected ? _surfacePanel : Colors.transparent,
           borderRadius: BorderRadius.circular(6),
-          boxShadow: isSelected ? AppColors.softShadow(opacity: 0.05) : null,
+          boxShadow: isSelected && !_isDark ? AppColors.softShadow(opacity: 0.05) : null,
         ),
         child: Row(
           mainAxisAlignment: MainAxisAlignment.center,
@@ -983,7 +1013,7 @@ class _UserProfileScreenState extends ConsumerState<UserProfileScreen> {
             Icon(
               icon,
               size: 16,
-              color: isSelected ? AppColors.inkPrimary : AppColors.inkSecondary,
+              color: isSelected ? _primaryInk : _secondaryInk,
             ),
             const SizedBox(width: 6),
             Text(
@@ -991,9 +1021,7 @@ class _UserProfileScreenState extends ConsumerState<UserProfileScreen> {
               style: TextStyle(
                 fontSize: 12,
                 fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
-                color: isSelected
-                    ? AppColors.inkPrimary
-                    : AppColors.inkSecondary,
+                color: isSelected ? _primaryInk : _secondaryInk,
               ),
             ),
           ],

@@ -35,6 +35,14 @@ class _AdminAuditLogsScreenState extends ConsumerState<AdminAuditLogsScreen> {
   String _selectedCategory = 'all';
   int? _selectedUserId;
 
+  bool get _isDark => Theme.of(context).brightness == Brightness.dark;
+  Color get _surfacePanel => _isDark ? AppColors.darkSurfacePanel : AppColors.surfacePanel;
+  Color get _surfaceSunken => _isDark ? AppColors.darkSurfaceSunken : AppColors.surfaceSunken;
+  Color get _lineBorder => _isDark ? AppColors.darkLineHairline : AppColors.lineHairline;
+  Color get _primaryInk => _isDark ? AppColors.darkInkPrimary : AppColors.inkPrimary;
+  Color get _secondaryInk => _isDark ? AppColors.darkInkSecondary : AppColors.inkSecondary;
+  Color get _mutedInk => _isDark ? AppColors.darkInkMuted : AppColors.inkMuted;
+
   @override
   void initState() {
     super.initState();
@@ -139,7 +147,7 @@ class _AdminAuditLogsScreenState extends ConsumerState<AdminAuditLogsScreen> {
 
   Widget _buildFilterBar() {
     return Container(
-      color: AppColors.surfacePanel,
+      color: _surfacePanel,
       padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -148,27 +156,36 @@ class _AdminAuditLogsScreenState extends ConsumerState<AdminAuditLogsScreen> {
             children: [
               Expanded(
                 child: TextField(
+                  style: TextStyle(fontSize: 13, color: _primaryInk),
                   decoration: InputDecoration(
                     hintText:
                         'Search by actor, event, device ID, or user ID...',
-                    prefixIcon: const Icon(Icons.search, size: 20),
+                    hintStyle: TextStyle(fontSize: 13, color: _mutedInk),
+                    prefixIcon: Icon(Icons.search, size: 20, color: _secondaryInk),
                     isDense: true,
                     filled: true,
-                    fillColor: AppColors.surfaceSunken,
+                    fillColor: _surfaceSunken,
                     contentPadding: const EdgeInsets.symmetric(
                       horizontal: 12,
                       vertical: 10,
                     ),
                     border: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(8),
-                      borderSide: const BorderSide(
-                        color: AppColors.lineHairline,
+                      borderSide: BorderSide(
+                        color: _lineBorder,
                       ),
                     ),
                     enabledBorder: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(8),
+                      borderSide: BorderSide(
+                        color: _lineBorder,
+                      ),
+                    ),
+                    focusedBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(8),
                       borderSide: const BorderSide(
-                        color: AppColors.lineHairline,
+                        color: AppColors.accentIndigo,
+                        width: 1.5,
                       ),
                     ),
                   ),
@@ -181,39 +198,40 @@ class _AdminAuditLogsScreenState extends ConsumerState<AdminAuditLogsScreen> {
                 height: 40,
                 padding: const EdgeInsets.symmetric(horizontal: 10),
                 decoration: BoxDecoration(
-                  color: AppColors.surfaceSunken,
+                  color: _surfaceSunken,
                   borderRadius: BorderRadius.circular(8),
-                  border: Border.all(color: AppColors.lineHairline),
+                  border: Border.all(color: _lineBorder),
                 ),
                 child: DropdownButtonHideUnderline(
                   child: DropdownButton<int?>(
                     value: _selectedUserId,
+                    dropdownColor: _surfacePanel,
                     isDense: true,
-                    icon: const Icon(
+                    icon: Icon(
                       Icons.arrow_drop_down,
                       size: 20,
-                      color: AppColors.inkSecondary,
+                      color: _secondaryInk,
                     ),
-                    hint: const Row(
+                    hint: Row(
                       mainAxisSize: MainAxisSize.min,
                       children: [
                         Icon(
                           Icons.person_outline,
                           size: 16,
-                          color: AppColors.inkSecondary,
+                          color: _secondaryInk,
                         ),
-                        SizedBox(width: 6),
+                        const SizedBox(width: 6),
                         Text(
                           'All Users',
                           style: TextStyle(
                             fontSize: 13,
-                            color: AppColors.inkPrimary,
+                            color: _primaryInk,
                           ),
                         ),
                       ],
                     ),
                     items: [
-                      const DropdownMenuItem<int?>(
+                      DropdownMenuItem<int?>(
                         value: null,
                         child: Row(
                           mainAxisSize: MainAxisSize.min,
@@ -221,14 +239,15 @@ class _AdminAuditLogsScreenState extends ConsumerState<AdminAuditLogsScreen> {
                             Icon(
                               Icons.people_outline,
                               size: 16,
-                              color: AppColors.inkSecondary,
+                              color: _secondaryInk,
                             ),
-                            SizedBox(width: 6),
+                            const SizedBox(width: 6),
                             Text(
                               'All Users',
                               style: TextStyle(
                                 fontSize: 13,
                                 fontWeight: FontWeight.w600,
+                                color: _primaryInk,
                               ),
                             ),
                           ],
@@ -241,15 +260,18 @@ class _AdminAuditLogsScreenState extends ConsumerState<AdminAuditLogsScreen> {
                             child: Row(
                               mainAxisSize: MainAxisSize.min,
                               children: [
-                                const Icon(
+                                Icon(
                                   Icons.person_outline,
                                   size: 16,
-                                  color: AppColors.inkSecondary,
+                                  color: _secondaryInk,
                                 ),
                                 const SizedBox(width: 6),
                                 Text(
                                   '${u.fullName} (@${u.username})',
-                                  style: const TextStyle(fontSize: 13),
+                                  style: TextStyle(
+                                    fontSize: 13,
+                                    color: _primaryInk,
+                                  ),
                                 ),
                               ],
                             ),
@@ -266,9 +288,9 @@ class _AdminAuditLogsScreenState extends ConsumerState<AdminAuditLogsScreen> {
               if (_allLogs != null)
                 Text(
                   '${_filteredLogs.length} of ${_allLogs!.length} records',
-                  style: const TextStyle(
+                  style: TextStyle(
                     fontSize: 12,
-                    color: AppColors.inkSecondary,
+                    color: _secondaryInk,
                     fontWeight: FontWeight.w500,
                   ),
                 ),
@@ -309,11 +331,11 @@ class _AdminAuditLogsScreenState extends ConsumerState<AdminAuditLogsScreen> {
         style: TextStyle(
           fontSize: 12,
           fontWeight: isSelected ? FontWeight.w600 : FontWeight.normal,
-          color: isSelected ? Colors.white : AppColors.inkPrimary,
+          color: isSelected ? Colors.white : _primaryInk,
         ),
       ),
-      backgroundColor: AppColors.surfaceSunken,
-      selectedColor: AppColors.accentLedger,
+      backgroundColor: _surfaceSunken,
+      selectedColor: _isDark ? const Color(0xFF6366F1) : AppColors.accentIndigo,
       showCheckmark: false,
       padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
       onSelected: (_) => setState(() => _selectedCategory = category),
@@ -359,9 +381,9 @@ class _AdminAuditLogsScreenState extends ConsumerState<AdminAuditLogsScreen> {
           children: [
             Icon(Icons.search_off, size: 48, color: Colors.grey.shade400),
             const SizedBox(height: 12),
-            const Text(
+            Text(
               'No audit records found matching your filters.',
-              style: TextStyle(color: AppColors.inkSecondary, fontSize: 14),
+              style: TextStyle(color: _secondaryInk, fontSize: 14),
             ),
           ],
         ),
@@ -373,13 +395,13 @@ class _AdminAuditLogsScreenState extends ConsumerState<AdminAuditLogsScreen> {
     return LayoutBuilder(
       builder: (context, constraints) {
         return SingleChildScrollView(
-          padding: const EdgeInsets.all(20),
+          padding: const EdgeInsets.fromLTRB(20, 20, 20, AppSpacing.scrollBottomPad),
           child: Container(
             decoration: BoxDecoration(
-              color: AppColors.surfacePanel,
-              borderRadius: BorderRadius.circular(10),
-              border: Border.all(color: AppColors.lineHairline),
-              boxShadow: AppColors.softShadow(),
+              color: _surfacePanel,
+              borderRadius: BorderRadius.circular(14),
+              border: Border.all(color: _lineBorder),
+              boxShadow: _isDark ? null : AppColors.softShadow(),
             ),
             clipBehavior: Clip.antiAlias,
             child: SingleChildScrollView(
@@ -389,13 +411,13 @@ class _AdminAuditLogsScreenState extends ConsumerState<AdminAuditLogsScreen> {
                   minWidth: constraints.maxWidth - 40,
                 ),
                 child: DataTable(
-                  headingRowColor: const WidgetStatePropertyAll(
-                    AppColors.surfaceSunken,
+                  headingRowColor: WidgetStatePropertyAll(
+                    _surfaceSunken,
                   ),
-                  headingTextStyle: const TextStyle(
+                  headingTextStyle: TextStyle(
                     fontSize: 12,
                     fontWeight: FontWeight.w700,
-                    color: AppColors.inkPrimary,
+                    color: _primaryInk,
                     letterSpacing: 0.4,
                   ),
                   dataRowMinHeight: 50,
@@ -418,10 +440,10 @@ class _AdminAuditLogsScreenState extends ConsumerState<AdminAuditLogsScreen> {
                         DataCell(
                           Text(
                             dateFormat.format(log.createdAt.toLocal()),
-                            style: const TextStyle(
+                            style: TextStyle(
                               fontSize: 12,
                               fontFamily: 'IBM Plex Mono',
-                              color: AppColors.inkPrimary,
+                              color: _primaryInk,
                             ),
                           ),
                         ),
@@ -429,10 +451,10 @@ class _AdminAuditLogsScreenState extends ConsumerState<AdminAuditLogsScreen> {
                         DataCell(
                           Text(
                             log.actor,
-                            style: const TextStyle(
+                            style: TextStyle(
                               fontSize: 12,
                               fontWeight: FontWeight.w600,
-                              color: AppColors.inkPrimary,
+                              color: _primaryInk,
                             ),
                           ),
                         ),
@@ -453,17 +475,17 @@ class _AdminAuditLogsScreenState extends ConsumerState<AdminAuditLogsScreen> {
                                       u != null
                                           ? '${u.fullName}\n(#${log.userId})'
                                           : '#${log.userId}',
-                                      style: const TextStyle(
+                                      style: TextStyle(
                                         fontSize: 12,
                                         fontWeight: FontWeight.w500,
-                                        color: AppColors.inkPrimary,
+                                        color: _primaryInk,
                                       ),
                                     ),
                                   );
                                 }()
-                              : const Text(
+                              : Text(
                                   '—',
-                                  style: TextStyle(color: AppColors.inkMuted),
+                                  style: TextStyle(color: _mutedInk),
                                 ),
                         ),
                         DataCell(
@@ -478,16 +500,16 @@ class _AdminAuditLogsScreenState extends ConsumerState<AdminAuditLogsScreen> {
                                       child: Text(
                                         log.deviceId!,
                                         overflow: TextOverflow.ellipsis,
-                                        style: const TextStyle(
+                                        style: TextStyle(
                                           fontSize: 12,
                                           fontFamily: 'IBM Plex Mono',
-                                          color: AppColors.inkPrimary,
+                                          color: _primaryInk,
                                         ),
                                       ),
                                     ),
                                     const SizedBox(width: 4),
                                     IconButton(
-                                      icon: const Icon(Icons.copy, size: 14),
+                                      icon: Icon(Icons.copy, size: 14, color: _secondaryInk),
                                       tooltip: 'Copy Device ID',
                                       padding: EdgeInsets.zero,
                                       constraints: const BoxConstraints(),
@@ -509,9 +531,9 @@ class _AdminAuditLogsScreenState extends ConsumerState<AdminAuditLogsScreen> {
                                     ),
                                   ],
                                 )
-                              : const Text(
+                              : Text(
                                   '—',
-                                  style: TextStyle(color: AppColors.inkMuted),
+                                  style: TextStyle(color: _mutedInk),
                                 ),
                         ),
                         DataCell(
@@ -521,9 +543,9 @@ class _AdminAuditLogsScreenState extends ConsumerState<AdminAuditLogsScreen> {
                               summary,
                               maxLines: 1,
                               overflow: TextOverflow.ellipsis,
-                              style: const TextStyle(
+                              style: TextStyle(
                                 fontSize: 12,
-                                color: AppColors.inkSecondary,
+                                color: _secondaryInk,
                               ),
                             ),
                           ),
@@ -531,6 +553,8 @@ class _AdminAuditLogsScreenState extends ConsumerState<AdminAuditLogsScreen> {
                         DataCell(
                           OutlinedButton.icon(
                             style: OutlinedButton.styleFrom(
+                              foregroundColor: _primaryInk,
+                              side: BorderSide(color: _lineBorder),
                               padding: const EdgeInsets.symmetric(
                                 horizontal: 10,
                                 vertical: 4,
@@ -538,13 +562,14 @@ class _AdminAuditLogsScreenState extends ConsumerState<AdminAuditLogsScreen> {
                               minimumSize: Size.zero,
                               tapTargetSize: MaterialTapTargetSize.shrinkWrap,
                             ),
-                            icon: const Icon(
+                            icon: Icon(
                               Icons.visibility_outlined,
                               size: 14,
+                              color: _primaryInk,
                             ),
-                            label: const Text(
+                            label: Text(
                               'View',
-                              style: TextStyle(fontSize: 11),
+                              style: TextStyle(fontSize: 11, color: _primaryInk),
                             ),
                             onPressed: () => _showLogDetails(log),
                           ),
@@ -563,35 +588,35 @@ class _AdminAuditLogsScreenState extends ConsumerState<AdminAuditLogsScreen> {
 
   Widget _buildBadge(String eventType) {
     final ev = eventType.toLowerCase();
-    Color badgeBg = Colors.grey.shade100;
-    Color badgeBorder = Colors.grey.shade300;
-    Color badgeText = Colors.grey.shade800;
+    Color badgeBg = _isDark ? const Color(0xFF1E293B) : Colors.grey.shade100;
+    Color badgeBorder = _isDark ? const Color(0xFF475569) : Colors.grey.shade300;
+    Color badgeText = _isDark ? const Color(0xFFE2E8F0) : Colors.grey.shade800;
     IconData badgeIcon = Icons.info_outline;
 
     if (ev.contains('revoked') || ev.contains('rejected')) {
-      badgeBg = Colors.red.shade50;
-      badgeBorder = Colors.red.shade200;
-      badgeText = Colors.red.shade800;
+      badgeBg = _isDark ? const Color(0xFF450A0A) : Colors.red.shade50;
+      badgeBorder = _isDark ? const Color(0xFF991B1B) : Colors.red.shade200;
+      badgeText = _isDark ? const Color(0xFFFCA5A5) : Colors.red.shade800;
       badgeIcon = Icons.block_rounded;
     } else if (ev.contains('approved')) {
-      badgeBg = Colors.green.shade50;
-      badgeBorder = Colors.green.shade200;
-      badgeText = Colors.green.shade800;
+      badgeBg = _isDark ? const Color(0xFF052E16) : Colors.green.shade50;
+      badgeBorder = _isDark ? const Color(0xFF166534) : Colors.green.shade200;
+      badgeText = _isDark ? const Color(0xFF86EFAC) : Colors.green.shade800;
       badgeIcon = Icons.check_circle_outline;
     } else if (ev.contains('registered') || ev.contains('issued')) {
-      badgeBg = Colors.blue.shade50;
-      badgeBorder = Colors.blue.shade200;
-      badgeText = Colors.blue.shade800;
+      badgeBg = _isDark ? const Color(0xFF172554) : Colors.blue.shade50;
+      badgeBorder = _isDark ? const Color(0xFF1E40AF) : Colors.blue.shade200;
+      badgeText = _isDark ? const Color(0xFF93C5FD) : Colors.blue.shade800;
       badgeIcon = Icons.vpn_key_outlined;
     } else if (ev.contains('otp')) {
-      badgeBg = Colors.teal.shade50;
-      badgeBorder = Colors.teal.shade200;
-      badgeText = Colors.teal.shade800;
+      badgeBg = _isDark ? const Color(0xFF042F2E) : Colors.teal.shade50;
+      badgeBorder = _isDark ? const Color(0xFF115E59) : Colors.teal.shade200;
+      badgeText = _isDark ? const Color(0xFF5EEAD4) : Colors.teal.shade800;
       badgeIcon = Icons.verified_user_outlined;
     } else if (ev.contains('requested')) {
-      badgeBg = Colors.amber.shade50;
-      badgeBorder = Colors.amber.shade200;
-      badgeText = Colors.amber.shade900;
+      badgeBg = _isDark ? const Color(0xFF451A03) : Colors.amber.shade50;
+      badgeBorder = _isDark ? const Color(0xFF92400E) : Colors.amber.shade200;
+      badgeText = _isDark ? const Color(0xFFFCD34D) : Colors.amber.shade900;
       badgeIcon = Icons.hourglass_top_rounded;
     }
 
@@ -650,13 +675,22 @@ class _AdminAuditLogsScreenState extends ConsumerState<AdminAuditLogsScreen> {
     showDialog<void>(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: const Row(
+        backgroundColor: _surfacePanel,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(12),
+          side: BorderSide(color: _lineBorder),
+        ),
+        title: Row(
           children: [
-            Icon(Icons.history_outlined, size: 22, color: AppColors.inkPrimary),
-            SizedBox(width: 8),
+            Icon(Icons.history_outlined, size: 22, color: _primaryInk),
+            const SizedBox(width: 8),
             Text(
               'Audit Log Details',
-              style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+              style: TextStyle(
+                fontSize: 16,
+                fontWeight: FontWeight.bold,
+                color: _primaryInk,
+              ),
             ),
           ],
         ),
@@ -683,28 +717,29 @@ class _AdminAuditLogsScreenState extends ConsumerState<AdminAuditLogsScreen> {
                   Row(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      const SizedBox(
+                      SizedBox(
                         width: 120,
                         child: Text(
                           'Device ID:',
                           style: TextStyle(
                             fontWeight: FontWeight.w600,
                             fontSize: 13,
-                            color: AppColors.inkSecondary,
+                            color: _secondaryInk,
                           ),
                         ),
                       ),
                       Expanded(
                         child: SelectableText(
                           log.deviceId!,
-                          style: const TextStyle(
+                          style: TextStyle(
                             fontFamily: 'IBM Plex Mono',
                             fontSize: 12,
+                            color: _primaryInk,
                           ),
                         ),
                       ),
                       IconButton(
-                        icon: const Icon(Icons.copy, size: 16),
+                        icon: Icon(Icons.copy, size: 16, color: _secondaryInk),
                         tooltip: 'Copy Device ID',
                         padding: EdgeInsets.zero,
                         constraints: const BoxConstraints(),
@@ -722,12 +757,12 @@ class _AdminAuditLogsScreenState extends ConsumerState<AdminAuditLogsScreen> {
                   ),
                 ],
                 const SizedBox(height: 14),
-                const Text(
+                Text(
                   'Metadata / Payload:',
                   style: TextStyle(
                     fontWeight: FontWeight.w600,
                     fontSize: 13,
-                    color: AppColors.inkSecondary,
+                    color: _secondaryInk,
                   ),
                 ),
                 const SizedBox(height: 6),
@@ -770,17 +805,17 @@ class _AdminAuditLogsScreenState extends ConsumerState<AdminAuditLogsScreen> {
             width: 120,
             child: Text(
               '$label:',
-              style: const TextStyle(
+              style: TextStyle(
                 fontWeight: FontWeight.w600,
                 fontSize: 13,
-                color: AppColors.inkSecondary,
+                color: _secondaryInk,
               ),
             ),
           ),
           Expanded(
             child: Text(
               value,
-              style: const TextStyle(fontSize: 13, color: AppColors.inkPrimary),
+              style: TextStyle(fontSize: 13, color: _primaryInk),
             ),
           ),
         ],
@@ -790,9 +825,9 @@ class _AdminAuditLogsScreenState extends ConsumerState<AdminAuditLogsScreen> {
 
   Widget _buildMetadataWidget(String metadata) {
     if (metadata.isEmpty) {
-      return const Text(
+      return Text(
         'No additional metadata recorded.',
-        style: TextStyle(fontSize: 12, color: AppColors.inkMuted),
+        style: TextStyle(fontSize: 12, color: _mutedInk),
       );
     }
     try {
@@ -803,9 +838,9 @@ class _AdminAuditLogsScreenState extends ConsumerState<AdminAuditLogsScreen> {
           width: double.infinity,
           padding: const EdgeInsets.all(12),
           decoration: BoxDecoration(
-            color: Colors.grey.shade50,
+            color: _surfaceSunken,
             borderRadius: BorderRadius.circular(8),
-            border: Border.all(color: Colors.grey.shade200),
+            border: Border.all(color: _lineBorder),
           ),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -818,18 +853,18 @@ class _AdminAuditLogsScreenState extends ConsumerState<AdminAuditLogsScreen> {
                     children: [
                       Text(
                         '• ${e.key}: ',
-                        style: const TextStyle(
+                        style: TextStyle(
                           fontSize: 12,
                           fontWeight: FontWeight.w600,
-                          color: AppColors.inkPrimary,
+                          color: _primaryInk,
                         ),
                       ),
                       Expanded(
                         child: SelectableText(
                           '${e.value}',
-                          style: const TextStyle(
+                          style: TextStyle(
                             fontSize: 12,
-                            color: AppColors.inkSecondary,
+                            color: _secondaryInk,
                           ),
                         ),
                       ),
@@ -846,13 +881,13 @@ class _AdminAuditLogsScreenState extends ConsumerState<AdminAuditLogsScreen> {
       width: double.infinity,
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
-        color: Colors.grey.shade50,
+        color: _surfaceSunken,
         borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: Colors.grey.shade200),
+        border: Border.all(color: _lineBorder),
       ),
       child: SelectableText(
         metadata,
-        style: const TextStyle(fontSize: 12, color: AppColors.inkSecondary),
+        style: TextStyle(fontSize: 12, color: _primaryInk),
       ),
     );
   }

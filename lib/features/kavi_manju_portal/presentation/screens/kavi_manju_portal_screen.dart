@@ -3,7 +3,6 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../../core/portal_links/portal_link_catalog_repository.dart';
 import '../../../../core/rbac/current_user_provider.dart';
-import '../../../../shared_widgets/page_header.dart';
 import '../../../../shared_widgets/portal_link_grid.dart';
 import '../../../portal_auth/presentation/controllers/portal_auth_controllers.dart';
 
@@ -68,12 +67,9 @@ class KaviManjuPortalScreen extends ConsumerWidget {
         ? dynamicCategories
         : filterGrantedCategories(dynamicCategories, grantedKeys);
 
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        const PageHeader(title: 'Kavi Manju Portal', icon: Icons.apps_outlined, accentColor: Color(0xFF9333EA)),
-        Expanded(child: PortalCategoryListView(categories: categories)),
-      ],
+    return PortalCategoryListView(
+      categories: categories,
+      portalTitle: 'Kavi Manju Portal',
     );
   }
 }

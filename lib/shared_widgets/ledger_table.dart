@@ -56,9 +56,12 @@ class LedgerTable extends StatelessWidget {
 
   const LedgerTable({super.key, required this.columns, required this.rows, this.footer});
 
-  TableRow _headerRow() {
+  TableRow _headerRow(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     return TableRow(
-      decoration: const BoxDecoration(color: AppColors.accentLedgerTint),
+      decoration: BoxDecoration(
+        color: isDark ? const Color(0xFF1E1B4B) : AppColors.accentLedgerTint,
+      ),
       children: [
         for (final c in columns)
           LedgerCell(
@@ -66,7 +69,11 @@ class LedgerTable extends StatelessWidget {
             padding: const EdgeInsets.symmetric(horizontal: AppSpacing.md, vertical: AppSpacing.lg),
             child: Text(
               c.label,
-              style: const TextStyle(fontSize: 12, color: AppColors.accentLedger, fontWeight: FontWeight.w700),
+              style: TextStyle(
+                fontSize: 12,
+                color: isDark ? const Color(0xFFA5B4FC) : AppColors.accentLedger,
+                fontWeight: FontWeight.w700,
+              ),
             ),
           ),
       ],
@@ -75,20 +82,28 @@ class LedgerTable extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     return Container(
       decoration: BoxDecoration(
-        color: AppColors.surfacePanel,
+        color: isDark ? AppColors.darkSurfacePanel : AppColors.surfacePanel,
         borderRadius: BorderRadius.circular(10),
-        boxShadow: AppColors.softShadow(),
+        border: Border.all(
+          color: isDark ? AppColors.darkLineHairline : AppColors.lineHairline,
+        ),
+        boxShadow: isDark ? null : AppColors.softShadow(),
       ),
       clipBehavior: Clip.antiAlias,
       child: Table(
         columnWidths: {for (var i = 0; i < columns.length; i++) i: columns[i].width},
-        border: const TableBorder(horizontalInside: BorderSide(color: AppColors.lineHairline)),
+        border: TableBorder(
+          horizontalInside: BorderSide(
+            color: isDark ? AppColors.darkLineHairline : AppColors.lineHairline,
+          ),
+        ),
         children: [
-          _headerRow(),
+          _headerRow(context),
           ...rows,
-          if (footer != null) footer!,
+          ?footer,
         ],
       ),
     );

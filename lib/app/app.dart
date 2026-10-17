@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../core/theme/app_theme.dart';
+import '../core/theme/theme_mode_provider.dart';
 import '../core/updates/app_update_service.dart';
 import '../features/auth/presentation/screens/login_screen.dart';
 import '../features/portal_auth/presentation/controllers/portal_auth_controllers.dart';
@@ -52,6 +53,8 @@ class _MisAppState extends ConsumerState<MisApp> {
   @override
   Widget build(BuildContext context) {
     final portalSessionAsync = ref.watch(portalSessionControllerProvider);
+    final themeMode = ref.watch(themeModeProvider);
+
     final Widget home = portalSessionAsync.when(
       loading: () => _loadingHome,
       error: (_, _) => const LoginScreen(),
@@ -63,6 +66,8 @@ class _MisAppState extends ConsumerState<MisApp> {
       navigatorKey: appNavigatorKey,
       title: 'ARMSS Gateway',
       theme: AppTheme.light(),
+      darkTheme: AppTheme.dark(),
+      themeMode: themeMode,
       debugShowCheckedModeBanner: false,
       home: home,
     );

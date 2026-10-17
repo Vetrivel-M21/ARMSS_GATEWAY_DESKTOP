@@ -19,6 +19,8 @@ class PageHeader extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final color = accentColor ?? AppColors.accentLedger;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final primaryInk = isDark ? AppColors.darkInkPrimary : AppColors.inkPrimary;
     return Container(
       // The bottom margin (as opposed to more bottom padding) is what
       // actually separates the header from whatever a screen stacks next —
@@ -39,7 +41,7 @@ class PageHeader extends StatelessWidget {
             ),
             const SizedBox(width: AppSpacing.md),
           ],
-          Text(title, style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w700, color: AppColors.inkPrimary)),
+          Text(title, style: TextStyle(fontSize: 20, fontWeight: FontWeight.w700, color: primaryInk)),
           const Spacer(),
           for (final action in actions) Padding(padding: const EdgeInsets.only(left: AppSpacing.sm), child: action),
         ],

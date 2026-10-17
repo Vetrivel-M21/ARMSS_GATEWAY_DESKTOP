@@ -1,13 +1,12 @@
 import 'package:flutter/material.dart';
 
-/// Modern/vibrant design tokens. Field names are kept from the earlier
-/// muted-ledger palette this replaced (`accentLedger`, `signalDebit`, etc.)
-/// even though the values are no longer ledger-green — renaming would touch
-/// every screen for no visual benefit, since only the hex values matter for
-/// what actually renders. Light mode only; dark mode deferred.
+/// Centralized design tokens for colors.
+/// UI accent color is Indigo (#4F46E5).
+/// Portal individual brand colors remain for portal card stripes.
 class AppColors {
   AppColors._();
 
+  // Light theme surfaces
   static const surfaceCanvas = Color(0xFFF5F6FA);
   static const surfacePanel = Color(0xFFFFFFFF);
   static const surfaceSunken = Color(0xFFF1F3F9);
@@ -16,33 +15,129 @@ class AppColors {
   static const inkMuted = Color(0xFF9CA3AF);
   static const lineHairline = Color(0xFFE5E7EB);
 
-  /// Primary vibrant accent (indigo) — active nav, primary buttons, links.
-  static const accentLedger = Color(0xFF4F46E5);
-  static const accentLedgerTint = Color(0xFFEEF2FF);
-  static const accentLedgerLight = Color(0xFF6D5EF0);
+  // Dark theme surfaces
+  static const darkSurfaceCanvas = Color(0xFF0F172A); // slate-900
+  static const darkSurfacePanel = Color(0xFF1E293B);  // slate-800
+  static const darkSurfaceSunken = Color(0xFF0B1322); // deep slate
+  static const darkInkPrimary = Color(0xFFF8FAFC);
+  static const darkInkSecondary = Color(0xFF94A3B8);
+  static const darkInkMuted = Color(0xFF64748B);
+  static const darkLineHairline = Color(0xFF334155);
+  static const darkNavRail = Color(0xFF0B1120);
+
+  // Single UI accent color: Indigo (#4F46E5)
+  static const accentIndigo = Color(0xFF4F46E5);
+  static const accentIndigoHover = Color(0xFF4338CA);
+  static const accentIndigoTint = Color(0xFFEEF2FF);
+  static const accentIndigoDarkTint = Color(0xFF1E1B4B);
+
+  // Backward compatibility aliases
+  static const accentLedger = accentIndigo;
+  static const accentLedgerTint = accentIndigoTint;
+  static const accentLedgerLight = Color(0xFF6366F1);
 
   static const signalDebit = Color(0xFFDC2626);
   static const signalCredit = Color(0xFF16A34A);
   static const signalError = Color(0xFFDC2626);
   static const signalAmber = Color(0xFFD97706);
 
-  /// Dark navy for the nav rail — deliberately the one dark surface in an
-  /// otherwise light app, for strong contrast against the white top bar and
-  /// light content area (the "framed" admin-dashboard layout).
+  // Nav rail dark navy
   static const navRailDark = Color(0xFF1E1B4B);
   static const navRailDarkText = Color(0xFFC7C5E8);
 
-  /// The 4 fixed chart-of-accounts categories each get their own identity
-  /// color, reused consistently between the Dashboard cards and Transaction
-  /// Entry's category sections.
+  // Fixed chart-of-accounts identity colors
   static const categoryAssets = Color(0xFF6366F1);
   static const categoryLiability = Color(0xFF0EA5E9);
   static const categoryIncome = Color(0xFF16A34A);
   static const categoryExpense = Color(0xFFD97706);
 
-  /// Soft shadow used on cards/panels/dialogs in place of a flat border.
+  /// Helper to dynamically resolve panel color based on context theme
+  static Color panelOf(BuildContext context) {
+    return Theme.of(context).brightness == Brightness.dark
+        ? darkSurfacePanel
+        : surfacePanel;
+  }
+
+  /// Helper to dynamically resolve canvas color based on context theme
+  static Color canvasOf(BuildContext context) {
+    return Theme.of(context).brightness == Brightness.dark
+        ? darkSurfaceCanvas
+        : surfaceCanvas;
+  }
+
+  /// Helper to dynamically resolve sunken surface color based on context theme
+  static Color sunkenOf(BuildContext context) {
+    return Theme.of(context).brightness == Brightness.dark
+        ? darkSurfaceSunken
+        : surfaceSunken;
+  }
+
+  /// Helper to dynamically resolve primary ink color based on context theme
+  static Color inkPrimaryOf(BuildContext context) {
+    return Theme.of(context).brightness == Brightness.dark
+        ? darkInkPrimary
+        : inkPrimary;
+  }
+
+  /// Helper to dynamically resolve secondary ink color based on context theme
+  static Color inkSecondaryOf(BuildContext context) {
+    return Theme.of(context).brightness == Brightness.dark
+        ? darkInkSecondary
+        : inkSecondary;
+  }
+
+  /// Helper to dynamically resolve hairline border color based on context theme
+  static Color borderOf(BuildContext context) {
+    return Theme.of(context).brightness == Brightness.dark
+        ? darkLineHairline
+        : lineHairline;
+  }
+
+  /// Soft shadow used on cards/panels/dialogs
   static List<BoxShadow> softShadow({double opacity = 0.06}) => [
-        BoxShadow(color: Colors.black.withValues(alpha: opacity), blurRadius: 12, offset: const Offset(0, 3)),
+        BoxShadow(
+          color: Colors.black.withValues(alpha: opacity),
+          blurRadius: 12,
+          offset: const Offset(0, 3),
+        ),
+      ];
+}
+
+/// Centralized corner radius tokens
+class AppRadii {
+  AppRadii._();
+
+  static const double sm = 6.0;
+  static const double md = 8.0;
+  static const double lg = 12.0;
+  static const double xl = 16.0;
+  static const double pill = 999.0;
+
+  static final roundedSm = BorderRadius.circular(sm);
+  static final roundedMd = BorderRadius.circular(md);
+  static final roundedLg = BorderRadius.circular(lg);
+  static final roundedXl = BorderRadius.circular(xl);
+  static final roundedPill = BorderRadius.circular(pill);
+}
+
+/// Centralized shadow tokens
+class AppShadows {
+  AppShadows._();
+
+  static List<BoxShadow> soft({double opacity = 0.06}) => [
+        BoxShadow(
+          color: Colors.black.withValues(alpha: opacity),
+          blurRadius: 12,
+          offset: const Offset(0, 3),
+        ),
+      ];
+
+  static List<BoxShadow> hover({Color? tint, double opacity = 0.12}) => [
+        BoxShadow(
+          color: (tint ?? Colors.black).withValues(alpha: opacity),
+          blurRadius: 20,
+          offset: const Offset(0, 8),
+        ),
       ];
 }
 
@@ -55,15 +150,24 @@ class AppSpacing {
   static const lg = 16.0;
   static const xl = 24.0;
   static const xxl = 32.0;
+  static const scrollBottomPad = 32.0; // Ensures last card row is fully visible and not hidden behind footer
 }
 
-/// The one place amount/date/id text gets its monospace treatment — deliberate
-/// and explicit per call site, not a blanket app-wide font, since body text
-/// stays IBM Plex Sans.
+/// Font family constants
+class AppFonts {
+  AppFonts._();
+  static const sans = 'IBM Plex Sans';
+  static const mono = 'IBM Plex Mono';
+}
+
+/// Monospace typography helpers
 class AppTextStyles {
   AppTextStyles._();
 
-  static const mono = TextStyle(fontFamily: 'IBM Plex Mono', fontFeatures: [FontFeature.tabularFigures()]);
+  static const mono = TextStyle(
+    fontFamily: AppFonts.mono,
+    fontFeatures: [FontFeature.tabularFigures()],
+  );
 
   static TextStyle monoWith({double? fontSize, FontWeight? fontWeight, Color? color}) {
     return mono.copyWith(fontSize: fontSize, fontWeight: fontWeight, color: color);
@@ -73,14 +177,11 @@ class AppTextStyles {
 class AppTheme {
   AppTheme._();
 
-  static const _panelRadius = 10.0;
-  static const _controlRadius = 8.0;
-
   static ThemeData light() {
-    final colorScheme = const ColorScheme.light(
-      primary: AppColors.accentLedger,
+    const colorScheme = ColorScheme.light(
+      primary: AppColors.accentIndigo,
       onPrimary: Colors.white,
-      secondary: AppColors.accentLedger,
+      secondary: AppColors.accentIndigo,
       onSecondary: Colors.white,
       error: AppColors.signalError,
       onError: Colors.white,
@@ -88,14 +189,15 @@ class AppTheme {
       onSurface: AppColors.inkPrimary,
     );
 
-    final controlShape = RoundedRectangleBorder(borderRadius: BorderRadius.circular(_controlRadius));
-    final panelShape = RoundedRectangleBorder(borderRadius: BorderRadius.circular(_panelRadius));
+    final controlShape = RoundedRectangleBorder(borderRadius: BorderRadius.circular(AppRadii.md));
+    final panelShape = RoundedRectangleBorder(borderRadius: BorderRadius.circular(AppRadii.xl));
 
     return ThemeData(
       useMaterial3: true,
+      brightness: Brightness.light,
       colorScheme: colorScheme,
       scaffoldBackgroundColor: AppColors.surfaceCanvas,
-      fontFamily: 'IBM Plex Sans',
+      fontFamily: AppFonts.sans,
       textTheme: const TextTheme(
         titleLarge: TextStyle(fontSize: 20, fontWeight: FontWeight.w700, color: AppColors.inkPrimary),
         titleMedium: TextStyle(fontSize: 15, fontWeight: FontWeight.w600, color: AppColors.inkPrimary),
@@ -119,10 +221,10 @@ class AppTheme {
       ),
       filledButtonTheme: FilledButtonThemeData(
         style: FilledButton.styleFrom(
-          backgroundColor: AppColors.accentLedger,
+          backgroundColor: AppColors.accentIndigo,
           foregroundColor: Colors.white,
           elevation: 1,
-          shadowColor: AppColors.accentLedger.withValues(alpha: 0.4),
+          shadowColor: AppColors.accentIndigo.withValues(alpha: 0.4),
           padding: const EdgeInsets.symmetric(horizontal: AppSpacing.lg, vertical: AppSpacing.md),
           shape: controlShape,
         ),
@@ -137,34 +239,136 @@ class AppTheme {
         ),
       ),
       textButtonTheme: TextButtonThemeData(
-        style: TextButton.styleFrom(foregroundColor: AppColors.accentLedger, shape: controlShape),
+        style: TextButton.styleFrom(foregroundColor: AppColors.accentIndigo, shape: controlShape),
       ),
       inputDecorationTheme: InputDecorationTheme(
         filled: true,
         fillColor: AppColors.surfaceSunken,
         contentPadding: const EdgeInsets.symmetric(horizontal: AppSpacing.md, vertical: AppSpacing.md),
         labelStyle: const TextStyle(fontSize: 12, color: AppColors.inkSecondary),
-        border: OutlineInputBorder(borderRadius: BorderRadius.circular(_controlRadius), borderSide: BorderSide.none),
-        enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(_controlRadius), borderSide: BorderSide.none),
-        focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(_controlRadius), borderSide: const BorderSide(color: AppColors.accentLedger, width: 2)),
-        errorBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(_controlRadius), borderSide: const BorderSide(color: AppColors.signalError)),
+        border: OutlineInputBorder(borderRadius: BorderRadius.circular(AppRadii.md), borderSide: BorderSide.none),
+        enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(AppRadii.md), borderSide: BorderSide.none),
+        focusedBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(AppRadii.md),
+          borderSide: const BorderSide(color: AppColors.accentIndigo, width: 2),
+        ),
+        errorBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(AppRadii.md), borderSide: const BorderSide(color: AppColors.signalError)),
         errorStyle: const TextStyle(color: AppColors.signalError, fontSize: 12),
       ),
       iconButtonTheme: IconButtonThemeData(
         style: IconButton.styleFrom(
           foregroundColor: AppColors.inkSecondary,
-          focusColor: AppColors.accentLedgerTint,
+          focusColor: AppColors.accentIndigoTint,
           side: BorderSide.none,
         ).copyWith(
           overlayColor: WidgetStateProperty.resolveWith((states) {
             if (states.contains(WidgetState.focused) || states.contains(WidgetState.hovered)) {
-              return AppColors.accentLedgerTint;
+              return AppColors.accentIndigoTint;
             }
             return null;
           }),
         ),
       ),
-      focusColor: AppColors.accentLedgerTint,
+      focusColor: AppColors.accentIndigoTint,
+    );
+  }
+
+  static ThemeData dark() {
+    const colorScheme = ColorScheme.dark(
+      primary: AppColors.accentIndigo,
+      onPrimary: Colors.white,
+      secondary: AppColors.accentIndigo,
+      onSecondary: Colors.white,
+      error: AppColors.signalError,
+      onError: Colors.white,
+      surface: AppColors.darkSurfacePanel,
+      onSurface: AppColors.darkInkPrimary,
+    );
+
+    final controlShape = RoundedRectangleBorder(borderRadius: BorderRadius.circular(AppRadii.md));
+    final panelShape = RoundedRectangleBorder(borderRadius: BorderRadius.circular(AppRadii.xl));
+
+    return ThemeData(
+      useMaterial3: true,
+      brightness: Brightness.dark,
+      colorScheme: colorScheme,
+      scaffoldBackgroundColor: AppColors.darkSurfaceCanvas,
+      fontFamily: AppFonts.sans,
+      textTheme: const TextTheme(
+        titleLarge: TextStyle(fontSize: 20, fontWeight: FontWeight.w700, color: AppColors.darkInkPrimary),
+        titleMedium: TextStyle(fontSize: 15, fontWeight: FontWeight.w600, color: AppColors.darkInkPrimary),
+        bodyMedium: TextStyle(fontSize: 13, color: AppColors.darkInkPrimary),
+        bodySmall: TextStyle(fontSize: 12, color: AppColors.darkInkSecondary),
+        labelSmall: TextStyle(fontSize: 11, fontWeight: FontWeight.w500, letterSpacing: 0.1, color: AppColors.darkInkSecondary),
+      ),
+      dividerColor: AppColors.darkLineHairline,
+      dividerTheme: const DividerThemeData(color: AppColors.darkLineHairline, thickness: 1, space: 1),
+      cardTheme: CardThemeData(
+        color: AppColors.darkSurfacePanel,
+        elevation: 0,
+        shape: panelShape,
+        margin: EdgeInsets.zero,
+      ),
+      dialogTheme: DialogThemeData(
+        backgroundColor: AppColors.darkSurfacePanel,
+        elevation: 8,
+        shadowColor: Colors.black.withValues(alpha: 0.4),
+        shape: panelShape,
+      ),
+      filledButtonTheme: FilledButtonThemeData(
+        style: FilledButton.styleFrom(
+          backgroundColor: AppColors.accentIndigo,
+          foregroundColor: Colors.white,
+          elevation: 1,
+          shadowColor: AppColors.accentIndigo.withValues(alpha: 0.4),
+          padding: const EdgeInsets.symmetric(horizontal: AppSpacing.lg, vertical: AppSpacing.md),
+          shape: controlShape,
+        ),
+      ),
+      outlinedButtonTheme: OutlinedButtonThemeData(
+        style: OutlinedButton.styleFrom(
+          foregroundColor: AppColors.darkInkPrimary,
+          backgroundColor: AppColors.darkSurfacePanel,
+          side: const BorderSide(color: AppColors.darkLineHairline),
+          padding: const EdgeInsets.symmetric(horizontal: AppSpacing.lg, vertical: AppSpacing.md),
+          shape: controlShape,
+        ),
+      ),
+      textButtonTheme: TextButtonThemeData(
+        style: TextButton.styleFrom(foregroundColor: AppColors.accentIndigo, shape: controlShape),
+      ),
+      inputDecorationTheme: InputDecorationTheme(
+        filled: true,
+        fillColor: AppColors.darkSurfaceSunken,
+        contentPadding: const EdgeInsets.symmetric(horizontal: AppSpacing.md, vertical: AppSpacing.md),
+        labelStyle: const TextStyle(fontSize: 12, color: AppColors.darkInkSecondary),
+        border: OutlineInputBorder(borderRadius: BorderRadius.circular(AppRadii.md), borderSide: BorderSide.none),
+        enabledBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(AppRadii.md),
+          borderSide: const BorderSide(color: AppColors.darkLineHairline),
+        ),
+        focusedBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(AppRadii.md),
+          borderSide: const BorderSide(color: AppColors.accentIndigo, width: 2),
+        ),
+        errorBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(AppRadii.md), borderSide: const BorderSide(color: AppColors.signalError)),
+        errorStyle: const TextStyle(color: AppColors.signalError, fontSize: 12),
+      ),
+      iconButtonTheme: IconButtonThemeData(
+        style: IconButton.styleFrom(
+          foregroundColor: AppColors.darkInkSecondary,
+          focusColor: AppColors.accentIndigoDarkTint,
+          side: BorderSide.none,
+        ).copyWith(
+          overlayColor: WidgetStateProperty.resolveWith((states) {
+            if (states.contains(WidgetState.focused) || states.contains(WidgetState.hovered)) {
+              return AppColors.accentIndigoDarkTint;
+            }
+            return null;
+          }),
+        ),
+      ),
+      focusColor: AppColors.accentIndigoDarkTint,
     );
   }
 }

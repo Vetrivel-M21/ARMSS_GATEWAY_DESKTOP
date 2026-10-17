@@ -1,23 +1,42 @@
 import 'package:flutter/material.dart';
 
+import '../core/theme/app_theme.dart';
+import '../core/updates/app_update_service.dart';
+
 /// Standardized ARMSS INFO TECH footer shown at the bottom of every screen.
-/// "ARMSS INFO TECH" is rendered in bold blue to highlight the brand.
+/// Displays application version and brand credits.
 class AppFooter extends StatelessWidget {
   const AppFooter({super.key});
 
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     return Container(
       width: double.infinity,
-      padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 16),
-      decoration: const BoxDecoration(
-        border: Border(top: BorderSide(color: Color(0xFFE5E7EB), width: 1)),
-        color: Color(0xFFFAFAFC),
+      padding: const EdgeInsets.symmetric(vertical: 9, horizontal: 16),
+      decoration: BoxDecoration(
+        border: Border(
+          top: BorderSide(
+            color: isDark ? AppColors.darkLineHairline : AppColors.lineHairline,
+            width: 1,
+          ),
+        ),
+        color: isDark ? AppColors.darkSurfacePanel : const Color(0xFFFAFAFC),
       ),
       child: Text.rich(
         TextSpan(
-          style: const TextStyle(fontSize: 11.5, color: Color(0xFF6B7280)),
+          style: TextStyle(
+            fontSize: 11.5,
+            color: isDark ? AppColors.darkInkMuted : const Color(0xFF6B7280),
+          ),
           children: [
+            TextSpan(
+              text: 'ARMSS Gateway v$currentAppVersion  •  ',
+              style: TextStyle(
+                fontWeight: FontWeight.w600,
+                color: isDark ? AppColors.darkInkSecondary : const Color(0xFF4B5563),
+              ),
+            ),
             const TextSpan(text: 'Software designed and developed by '),
             TextSpan(
               text: 'ARMSS INFO TECH',

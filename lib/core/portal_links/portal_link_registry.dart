@@ -188,3 +188,70 @@ const List<PortalLink> kAllPortalLinks = [
   ),
 ];
 
+/// Known category labels for all portal links across tabs.
+const Map<String, String> kPortalCategoryMap = {
+  'abi.trust': 'Finance & Lending',
+  'abi.overall_accounts': 'Finance & Lending',
+  'abi.mfi': 'Finance & Lending',
+  'abi.hanniji': 'Trading & Enterprises',
+  'abi.aura': 'Trading & Enterprises',
+  'abi.employment': 'Trading & Enterprises',
+  'abi.ornaments': 'Trading & Enterprises',
+  'abi.enterprises': 'Trading & Enterprises',
+  'abi.veyon_agency': 'Trading & Enterprises',
+  'abi.veyon_global': 'Trading & Enterprises',
+  'abi.hardware': 'Technology',
+  'kavi_manju.karumandapam': 'Finance & Lending',
+  'kavi_manju.neyveli': 'Finance & Lending',
+  'kavi_manju.karaikudi': 'Finance & Lending',
+  'kavi_manju.nidhi_rd': 'Finance & Lending',
+  'kavi_manju.smb_matriculation': 'Education',
+  'kavi_manju.smb_nursery': 'Education',
+  'kavi_manju.infotech': 'Technology',
+  'kavi_manju.mahesan_gl': 'Group Companies',
+  'kavi_manju.armss_gl': 'Group Companies',
+  'kavi_manju.mcf': 'Group Companies',
+  'kavi_manju.mis': 'Operations',
+  'vetri.veyon_stationery': 'Management',
+  'vetri.trust': 'Finance',
+  'dinesh.payroll': 'Payroll',
+};
+
+/// Checks whether a label represents an internal portal ownership / creator tab
+/// (such as "Abi Portal", "Kavi Manju Portal", "Vetri Portal", "Dinesh Portal")
+/// rather than a business functional category.
+bool isPortalOwnershipLabel(String? label) {
+  if (label == null || label.trim().isEmpty) return true;
+  final lower = label.trim().toLowerCase();
+  return lower == 'portal' ||
+      lower == 'open in browser' ||
+      lower.contains('abi') ||
+      lower.contains('kavi') ||
+      lower.contains('manju') ||
+      lower.contains('vetri') ||
+      lower.contains('dinesh') ||
+      lower.contains('other portal') ||
+      lower.endsWith(' portal') ||
+      lower.startsWith('portal ');
+}
+
+/// Resolves the category or group label for a given portal link,
+/// stripping out internal ownership labels.
+String? resolvePortalCategory(PortalLink link, [String? explicitCategory]) {
+  if (explicitCategory != null &&
+      explicitCategory.trim().isNotEmpty &&
+      !isPortalOwnershipLabel(explicitCategory)) {
+    return explicitCategory.trim();
+  }
+  if (link.tabName != null &&
+      link.tabName!.trim().isNotEmpty &&
+      !isPortalOwnershipLabel(link.tabName)) {
+    return link.tabName!.trim();
+  }
+  final mapped = kPortalCategoryMap[link.key];
+  if (mapped != null && mapped.trim().isNotEmpty && !isPortalOwnershipLabel(mapped)) {
+    return mapped.trim();
+  }
+  return null;
+}
+

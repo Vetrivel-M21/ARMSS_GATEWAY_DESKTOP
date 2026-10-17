@@ -1,7 +1,16 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
+import '../app/di/providers.dart';
 import '../core/device_auth/gated_link_launcher.dart';
+import '../core/portal_links/pinned_portals_provider.dart';
+import '../core/portal_links/portal_link_registry.dart';
+import '../core/rbac/current_user_provider.dart';
 import '../core/theme/app_theme.dart';
+import '../features/device_activation/presentation/controllers/device_access_controller.dart';
+import '../features/portal_auth/presentation/controllers/portal_auth_controllers.dart';
 
 /// A single external app: opens in the system default browser, no
 /// device-token gate, no embedded WebView — shared by every "portal
@@ -76,55 +85,611 @@ List<PortalCategory> filterGrantedCategories(
   ];
 }
 
-/// Renders every app across all categories as one continuous flowing grid —
-/// no section headers or dividers between categories, just a single wrap of
-/// cards — the shared body for any "portal launcher" screen. `extraTiles`
-/// lets a screen mix in one-off cards that don't fit the plain-link pattern
-/// (e.g. a card that navigates in-app instead of opening a browser).
-class PortalCategoryListView extends StatelessWidget {
+/// Renders every app across categories with:
+/// - Optional portal title & dynamic local-time greeting header
+/// - Live search filtering with `Ctrl+K` hint badge
+/// - Count pill badge
+/// - Grid View vs. List View switcher (persisted)
+/// - Pinned / Favorites section
+class PortalCategoryListView extends ConsumerStatefulWidget {
   final List<PortalCategory> categories;
   final List<Widget> extraTiles;
+  final String? portalTitle;
+  final VoidCallback? onRefresh;
+
   const PortalCategoryListView({
     super.key,
     required this.categories,
     this.extraTiles = const [],
+    this.portalTitle,
+    this.onRefresh,
   });
 
   @override
-  Widget build(BuildContext context) {
-    final links = [for (final category in categories) ...category.links];
-    return SingleChildScrollView(
-      padding: const EdgeInsets.fromLTRB(20, 0, 20, 20),
-      child: Wrap(
-        spacing: AppSpacing.lg,
-        runSpacing: AppSpacing.lg,
+  ConsumerState<PortalCategoryListView> createState() => _PortalCategoryListViewState();
+}
+
+class _PortalCategoryListViewState extends ConsumerState<PortalCategoryListView> {
+  final TextEditingController _searchController = TextEditingController();
+  final FocusNode _searchFocusNode = FocusNode();
+  String _searchQuery = '';
+  String _viewMode = 'grid'; // 'grid' | 'list'
+  bool _isRefreshing = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadViewMode();
+  }
+
+  @override
+  void dispose() {
+    _searchController.dispose();
+    _searchFocusNode.dispose();
+    super.dispose();
+  }
+
+  String _getGreeting() {
+    final hour = DateTime.now().hour;
+    if (hour < 12) {
+      return 'Good morning';
+    } else if (hour < 17) {
+      return 'Good afternoon';
+    } else {
+      return 'Good evening';
+    }
+  }
+
+  Future<void> _loadViewMode() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final mode = prefs.getString('portals_view_mode');
+      if (mode != null && (mode == 'grid' || mode == 'list')) {
+        if (mounted) setState(() => _viewMode = mode);
+      }
+    } catch (_) {}
+  }
+
+  Future<void> _updateViewMode(String mode) async {
+    setState(() => _viewMode = mode);
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString('portals_view_mode', mode);
+    } catch (_) {}
+  }
+
+  Future<void> _refreshData() async {
+    if (widget.onRefresh != null) {
+      widget.onRefresh!();
+      return;
+    }
+    if (_isRefreshing) return;
+    setState(() => _isRefreshing = true);
+    try {
+      ref.invalidate(portalSessionControllerProvider);
+      await ref.read(deviceAccessControllerProvider.notifier).checkStatus();
+      ref.read(appRefreshSignalProvider.notifier).update((v) => v + 1);
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Portal access permissions refreshed.'),
+            duration: Duration(seconds: 2),
+          ),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _isRefreshing = false);
+    }
+  }
+
+  Widget _buildPortalsCollection(
+    List<({PortalLink link, String categoryName})> items,
+    Set<String> pinnedKeys, {
+    List<Widget> extraTiles = const [],
+  }) {
+    if (_viewMode == 'list') {
+      return Column(
         children: [
-          for (final link in links)
-            SizedBox(
-              width: 200,
-              height: 164,
-              child: PortalCardTile(
-                name: link.name,
-                icon: link.icon,
-                color: link.color,
-                imageUrl: link.imageUrl,
-                onTap: () => launchGatedPortalLink(context, link),
+          for (final item in items)
+            Padding(
+              padding: const EdgeInsets.only(bottom: 8.0),
+              child: PortalListTile(
+                name: item.link.name,
+                url: item.link.url,
+                icon: item.link.icon,
+                color: item.link.color,
+                tabName: resolvePortalCategory(item.link, item.categoryName),
+                imageUrl: item.link.imageUrl,
+                isPinned: pinnedKeys.contains(item.link.key),
+                onTogglePin: () => ref
+                    .read(pinnedPortalsProvider.notifier)
+                    .togglePin(item.link.key),
+                onTap: () => launchGatedPortalLink(context, item.link),
               ),
             ),
           ...extraTiles,
+        ],
+      );
+    }
+
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        const spacing = AppSpacing.lg;
+        final availableWidth = constraints.maxWidth;
+        final cols = (availableWidth / 210.0).floor().clamp(1, 8);
+        final itemWidth = (availableWidth - (cols - 1) * spacing) / cols;
+
+        return Wrap(
+          spacing: spacing,
+          runSpacing: spacing,
+          children: [
+            for (final item in items)
+              SizedBox(
+                width: itemWidth,
+                height: 156,
+                child: PortalCardTile(
+                  name: item.link.name,
+                  icon: item.link.icon,
+                  color: item.link.color,
+                  categoryLabel: resolvePortalCategory(item.link, item.categoryName),
+                  imageUrl: item.link.imageUrl,
+                  isPinned: pinnedKeys.contains(item.link.key),
+                  onTogglePin: () => ref
+                      .read(pinnedPortalsProvider.notifier)
+                      .togglePin(item.link.key),
+                  onTap: () => launchGatedPortalLink(context, item.link),
+                ),
+              ),
+            ...extraTiles,
+          ],
+        );
+      },
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final pinnedKeys = ref.watch(pinnedPortalsProvider);
+    final allItems = [
+      for (final category in widget.categories)
+        for (final link in category.links)
+          (link: link, categoryName: category.name),
+    ];
+
+    final query = _searchQuery.trim().toLowerCase();
+    final filteredItems = query.isEmpty
+        ? allItems
+        : allItems.where((item) {
+            final nameMatch = item.link.name.toLowerCase().contains(query);
+            final catMatch = item.categoryName.toLowerCase().contains(query);
+            final tabMatch = item.link.tabName?.toLowerCase().contains(query) ?? false;
+            return nameMatch || catMatch || tabMatch;
+          }).toList();
+
+    final pinnedItems = filteredItems
+        .where((item) => pinnedKeys.contains(item.link.key))
+        .toList();
+
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final primaryInk = isDark ? AppColors.darkInkPrimary : AppColors.inkPrimary;
+    final secondaryInk = isDark ? AppColors.darkInkSecondary : AppColors.inkSecondary;
+    final surfacePanel = isDark ? AppColors.darkSurfacePanel : AppColors.surfacePanel;
+    final surfaceSunken = isDark ? AppColors.darkSurfaceSunken : AppColors.surfaceSunken;
+    final lineBorder = isDark ? AppColors.darkLineHairline : AppColors.lineHairline;
+
+    final session = ref.watch(portalSessionControllerProvider).valueOrNull;
+    final localUser = ref.watch(currentUserProvider);
+    final rawName = session?.fullName.isNotEmpty == true
+        ? session!.fullName
+        : (session?.username.isNotEmpty == true
+            ? session!.username
+            : (localUser?.fullName.isNotEmpty == true
+                ? localUser!.fullName
+                : (localUser?.username.isNotEmpty == true
+                    ? localUser!.username
+                    : 'User')));
+
+    return CallbackShortcuts(
+      bindings: {
+        const SingleActivator(LogicalKeyboardKey.keyK, control: true): () {
+          _searchFocusNode.requestFocus();
+          _searchController.selection = TextSelection(
+            baseOffset: 0,
+            extentOffset: _searchController.text.length,
+          );
+        },
+      },
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // 1. Greeting / Title Header (if portalTitle is provided)
+          if (widget.portalTitle != null)
+            Padding(
+              padding: const EdgeInsets.fromLTRB(24, 18, 24, 10),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                crossAxisAlignment: CrossAxisAlignment.center,
+                children: [
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          widget.portalTitle!,
+                          style: TextStyle(
+                            fontSize: 22,
+                            fontWeight: FontWeight.w700,
+                            color: primaryInk,
+                            letterSpacing: -0.3,
+                          ),
+                        ),
+                        const SizedBox(height: 3),
+                        Text(
+                          '${_getGreeting()}, $rawName • Launch and manage portals',
+                          style: TextStyle(
+                            fontSize: 12.5,
+                            color: secondaryInk,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  IconButton(
+                    icon: _isRefreshing
+                        ? const SizedBox(
+                            width: 16,
+                            height: 16,
+                            child: CircularProgressIndicator(strokeWidth: 2),
+                          )
+                        : const Icon(Icons.refresh_rounded, size: 20),
+                    tooltip: 'Refresh Permissions',
+                    onPressed: _isRefreshing ? null : _refreshData,
+                  ),
+                ],
+              ),
+            ),
+
+          // 2. Search Bar & View Mode Switcher
+          if (allItems.isNotEmpty)
+            Padding(
+              padding: const EdgeInsets.fromLTRB(24, 4, 24, 18),
+              child: Center(
+                child: ConstrainedBox(
+                  constraints: const BoxConstraints(maxWidth: 860),
+                  child: Row(
+                    children: [
+                      Expanded(
+                        child: Container(
+                          height: 44,
+                          decoration: BoxDecoration(
+                            color: surfacePanel,
+                            borderRadius: BorderRadius.circular(10),
+                            boxShadow: isDark ? null : AppColors.softShadow(opacity: 0.03),
+                            border: Border.all(color: lineBorder),
+                          ),
+                          child: TextField(
+                            controller: _searchController,
+                            focusNode: _searchFocusNode,
+                            onChanged: (val) => setState(() => _searchQuery = val),
+                            style: TextStyle(fontSize: 13.5, color: primaryInk),
+                            decoration: InputDecoration(
+                              hintText: 'Search portals by name or category...',
+                              hintStyle: const TextStyle(fontSize: 13, color: AppColors.inkMuted),
+                              prefixIcon: const Icon(Icons.search_rounded, size: 19, color: AppColors.inkMuted),
+                              suffixIcon: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  if (_searchQuery.isNotEmpty)
+                                    IconButton(
+                                      icon: Icon(Icons.clear_rounded, size: 16, color: secondaryInk),
+                                      tooltip: 'Clear Search',
+                                      onPressed: () {
+                                        _searchController.clear();
+                                        setState(() => _searchQuery = '');
+                                      },
+                                    ),
+                                  Container(
+                                    margin: const EdgeInsets.only(right: 8),
+                                    padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
+                                    decoration: BoxDecoration(
+                                      color: surfaceSunken,
+                                      borderRadius: BorderRadius.circular(6),
+                                      border: Border.all(color: lineBorder),
+                                    ),
+                                    child: Text(
+                                      'Ctrl+K',
+                                      style: TextStyle(
+                                        fontSize: 10.5,
+                                        fontWeight: FontWeight.w600,
+                                        color: secondaryInk,
+                                        fontFamily: AppFonts.mono,
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                              border: InputBorder.none,
+                              contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                              isDense: true,
+                            ),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: AppSpacing.md),
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 13, vertical: 8),
+                        decoration: BoxDecoration(
+                          color: surfaceSunken,
+                          borderRadius: BorderRadius.circular(999),
+                          border: Border.all(color: lineBorder),
+                        ),
+                        child: Text(
+                          query.isNotEmpty
+                              ? '${filteredItems.length} of ${allItems.length} portals'
+                              : '${allItems.length} total portals${pinnedItems.isNotEmpty ? ' • ${pinnedItems.length} pinned' : ''}',
+                          style: TextStyle(
+                            fontSize: 12,
+                            fontWeight: FontWeight.w600,
+                            color: secondaryInk,
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: AppSpacing.sm),
+                      Container(
+                        padding: const EdgeInsets.all(3),
+                        decoration: BoxDecoration(
+                          color: surfaceSunken,
+                          borderRadius: BorderRadius.circular(8),
+                          border: Border.all(color: lineBorder),
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            _PortalViewModeButton(
+                              icon: Icons.grid_view_rounded,
+                              tooltip: 'Grid View',
+                              isSelected: _viewMode == 'grid',
+                              onTap: () => _updateViewMode('grid'),
+                            ),
+                            const SizedBox(width: 2),
+                            _PortalViewModeButton(
+                              icon: Icons.view_list_rounded,
+                              tooltip: 'List View',
+                              isSelected: _viewMode == 'list',
+                              onTap: () => _updateViewMode('list'),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+
+          // 3. Content Area
+          Expanded(
+            child: allItems.isEmpty
+                ? Center(
+                    child: Text(
+                      'No portals configured.',
+                      style: TextStyle(color: secondaryInk),
+                    ),
+                  )
+                : filteredItems.isEmpty
+                    ? Center(
+                        child: Padding(
+                          padding: const EdgeInsets.all(32),
+                          child: Container(
+                            constraints: const BoxConstraints(maxWidth: 420),
+                            padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 36),
+                            decoration: BoxDecoration(
+                              color: surfacePanel,
+                              borderRadius: BorderRadius.circular(16),
+                              boxShadow: isDark ? null : AppColors.softShadow(),
+                              border: Border.all(color: lineBorder),
+                            ),
+                            child: Column(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Container(
+                                  width: 56,
+                                  height: 56,
+                                  decoration: BoxDecoration(
+                                    color: surfaceSunken,
+                                    shape: BoxShape.circle,
+                                  ),
+                                  child: const Icon(
+                                    Icons.search_off_rounded,
+                                    size: 28,
+                                    color: AppColors.inkMuted,
+                                  ),
+                                ),
+                                const SizedBox(height: 16),
+                                Text(
+                                  'No Portals Found',
+                                  style: TextStyle(
+                                    fontSize: 16,
+                                    fontWeight: FontWeight.w700,
+                                    color: primaryInk,
+                                  ),
+                                ),
+                                const SizedBox(height: 8),
+                                Text(
+                                  'No portals matched "$_searchQuery". Check for typos or clear your search query.',
+                                  textAlign: TextAlign.center,
+                                  style: TextStyle(
+                                    fontSize: 13,
+                                    color: secondaryInk,
+                                    height: 1.4,
+                                  ),
+                                ),
+                                const SizedBox(height: 20),
+                                TextButton.icon(
+                                  onPressed: () {
+                                    _searchController.clear();
+                                    setState(() => _searchQuery = '');
+                                  },
+                                  icon: const Icon(Icons.clear_rounded, size: 16),
+                                  label: const Text('Clear Search Query'),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                      )
+                    : SingleChildScrollView(
+                        padding: const EdgeInsets.fromLTRB(24, 0, 24, AppSpacing.scrollBottomPad),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            // Pinned Portals Section (if any pinned and not currently searching)
+                            if (query.isEmpty && pinnedItems.isNotEmpty) ...[
+                              Row(
+                                children: [
+                                  const Icon(Icons.star_rounded, size: 16, color: AppColors.signalAmber),
+                                  const SizedBox(width: 6),
+                                  Text(
+                                    'Pinned Portals',
+                                    style: TextStyle(
+                                      fontSize: 13,
+                                      fontWeight: FontWeight.w700,
+                                      color: primaryInk,
+                                      letterSpacing: 0.2,
+                                    ),
+                                  ),
+                                  const SizedBox(width: 8),
+                                  Container(
+                                    padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
+                                    decoration: BoxDecoration(
+                                      color: surfaceSunken,
+                                      borderRadius: BorderRadius.circular(999),
+                                    ),
+                                    child: Text(
+                                      '${pinnedItems.length}',
+                                      style: TextStyle(
+                                        fontSize: 11,
+                                        fontWeight: FontWeight.w600,
+                                        color: secondaryInk,
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                              const SizedBox(height: AppSpacing.sm),
+                              _buildPortalsCollection(pinnedItems, pinnedKeys),
+                              const SizedBox(height: AppSpacing.xl),
+                              Row(
+                                children: [
+                                  Icon(
+                                    _viewMode == 'grid'
+                                        ? Icons.grid_view_rounded
+                                        : Icons.view_list_rounded,
+                                    size: 16,
+                                    color: secondaryInk,
+                                  ),
+                                  const SizedBox(width: 6),
+                                  Text(
+                                    'All Portals',
+                                    style: TextStyle(
+                                      fontSize: 13,
+                                      fontWeight: FontWeight.w700,
+                                      color: primaryInk,
+                                      letterSpacing: 0.2,
+                                    ),
+                                  ),
+                                  const SizedBox(width: 8),
+                                  Container(
+                                    padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
+                                    decoration: BoxDecoration(
+                                      color: surfaceSunken,
+                                      borderRadius: BorderRadius.circular(999),
+                                    ),
+                                    child: Text(
+                                      '${filteredItems.length}',
+                                      style: TextStyle(
+                                        fontSize: 11,
+                                        fontWeight: FontWeight.w600,
+                                        color: secondaryInk,
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                              const SizedBox(height: AppSpacing.sm),
+                            ],
+
+                            // Main Portals Grid / List
+                            _buildPortalsCollection(
+                              filteredItems,
+                              pinnedKeys,
+                              extraTiles: widget.extraTiles,
+                            ),
+                          ],
+                        ),
+                      ),
+          ),
         ],
       ),
     );
   }
 }
 
-class PortalCardTile extends StatelessWidget {
+class _PortalViewModeButton extends StatelessWidget {
+  final IconData icon;
+  final String tooltip;
+  final bool isSelected;
+  final VoidCallback onTap;
+
+  const _PortalViewModeButton({
+    required this.icon,
+    required this.tooltip,
+    required this.isSelected,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    return Tooltip(
+      message: tooltip,
+      child: Material(
+        color: isSelected
+            ? (isDark ? AppColors.darkSurfacePanel : AppColors.surfacePanel)
+            : Colors.transparent,
+        borderRadius: BorderRadius.circular(6),
+        shadowColor: Colors.black.withValues(alpha: isDark ? 0.3 : 0.1),
+        elevation: isSelected ? 1 : 0,
+        child: InkWell(
+          onTap: onTap,
+          borderRadius: BorderRadius.circular(6),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 5),
+            child: Icon(
+              icon,
+              size: 18,
+              color: isSelected
+                  ? (isDark ? const Color(0xFF818CF8) : AppColors.accentIndigo)
+                  : AppColors.inkMuted,
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class PortalCardTile extends StatefulWidget {
   final String name;
   final IconData icon;
   final Color color;
   final VoidCallback onTap;
   final String caption;
+  final String? categoryLabel;
   final String? imageUrl;
+  final bool isPinned;
+  final VoidCallback? onTogglePin;
+
   const PortalCardTile({
     super.key,
     required this.name,
@@ -132,86 +697,459 @@ class PortalCardTile extends StatelessWidget {
     required this.color,
     required this.onTap,
     this.caption = 'Open in Browser',
+    this.categoryLabel,
     this.imageUrl,
+    this.isPinned = false,
+    this.onTogglePin,
   });
 
   @override
+  State<PortalCardTile> createState() => _PortalCardTileState();
+}
+
+class _PortalCardTileState extends State<PortalCardTile> {
+  bool _isHovered = false;
+  bool _isFocused = false;
+
+  @override
   Widget build(BuildContext context) {
-    return Material(
-      color: AppColors.surfacePanel,
-      borderRadius: BorderRadius.circular(14),
-      clipBehavior: Clip.antiAlias,
-      child: InkWell(
-        onTap: onTap,
-        hoverColor: color.withValues(alpha: 0.06),
-        child: Container(
-          decoration: BoxDecoration(boxShadow: AppColors.softShadow()),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Container(height: 4, color: color),
-              Expanded(
-                child: Padding(
-                  padding: const EdgeInsets.all(AppSpacing.lg),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Container(
-                        width: 44,
-                        height: 44,
-                        clipBehavior: Clip.antiAlias,
-                        decoration: BoxDecoration(
-                          color: color.withValues(alpha: 0.16),
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                        child: imageUrl == null
-                            ? Icon(icon, color: color, size: 22)
-                            : Image.network(
-                                imageUrl!,
-                                fit: BoxFit.cover,
-                                errorBuilder: (context, error, stackTrace) =>
-                                    Icon(icon, color: color, size: 22),
-                              ),
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final surfacePanel = isDark ? AppColors.darkSurfacePanel : AppColors.surfacePanel;
+    final lineBorder = isDark ? AppColors.darkLineHairline : AppColors.lineHairline;
+    final primaryInk = isDark ? AppColors.darkInkPrimary : AppColors.inkPrimary;
+    final secondaryInk = isDark ? AppColors.darkInkSecondary : AppColors.inkSecondary;
+
+    return MouseRegion(
+      cursor: SystemMouseCursors.click,
+      onEnter: (_) => setState(() => _isHovered = true),
+      onExit: (_) => setState(() => _isHovered = false),
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 180),
+        curve: Curves.easeOutCubic,
+        transform: Matrix4.translationValues(0, _isHovered ? -3.5 : 0.0, 0.0),
+        decoration: BoxDecoration(
+          color: surfacePanel,
+          borderRadius: BorderRadius.circular(16),
+          boxShadow: _isHovered
+              ? [
+                  BoxShadow(
+                    color: widget.color.withValues(alpha: isDark ? 0.28 : 0.16),
+                    blurRadius: 18,
+                    offset: const Offset(0, 8),
+                  ),
+                  ...AppColors.softShadow(opacity: isDark ? 0.25 : 0.07),
+                ]
+              : (_isFocused
+                  ? [
+                      BoxShadow(
+                        color: isDark
+                            ? const Color(0xFF818CF8).withValues(alpha: 0.70)
+                            : AppColors.accentIndigo.withValues(alpha: 0.45),
+                        blurRadius: 0,
+                        spreadRadius: 3,
                       ),
-                      const SizedBox(height: AppSpacing.md),
-                      Text(
-                        name,
-                        maxLines: 2,
-                        overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(
-                          fontSize: 14,
-                          fontWeight: FontWeight.w600,
-                          color: AppColors.inkPrimary,
-                        ),
+                      BoxShadow(
+                        color: AppColors.accentIndigo.withValues(alpha: 0.25),
+                        blurRadius: 12,
+                        offset: const Offset(0, 2),
                       ),
-                      const SizedBox(height: 4),
-                      Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          const Icon(
-                            Icons.open_in_browser,
-                            size: 12,
-                            color: AppColors.inkMuted,
-                          ),
-                          const SizedBox(width: 4),
-                          Text(
-                            caption,
-                            style: const TextStyle(
-                              fontSize: 11,
-                              color: AppColors.inkMuted,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ],
+                    ]
+                  : AppColors.softShadow(opacity: isDark ? 0.12 : 0.04)),
+          border: Border.all(
+            color: _isFocused
+                ? (isDark ? const Color(0xFF818CF8) : AppColors.accentIndigo)
+                : (_isHovered
+                    ? widget.color.withValues(alpha: 0.55)
+                    : lineBorder.withValues(alpha: 0.8)),
+            width: _isFocused ? 2.0 : (_isHovered ? 1.5 : 1.0),
+          ),
+        ),
+        clipBehavior: Clip.antiAlias,
+        child: Material(
+          color: Colors.transparent,
+          child: InkWell(
+            onTap: widget.onTap,
+            onFocusChange: (focused) => setState(() => _isFocused = focused),
+            hoverColor: Colors.transparent,
+            splashColor: widget.color.withValues(alpha: 0.08),
+            highlightColor: widget.color.withValues(alpha: 0.04),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // Top brand accent stripe
+                AnimatedContainer(
+                  duration: const Duration(milliseconds: 180),
+                  height: _isHovered ? 5 : 4,
+                  decoration: BoxDecoration(
+                    color: widget.color,
+                    gradient: LinearGradient(
+                      colors: [
+                        widget.color,
+                        widget.color.withValues(alpha: 0.85),
+                      ],
+                    ),
                   ),
                 ),
-              ),
-            ],
+
+                Expanded(
+                  child: Padding(
+                    padding: const EdgeInsets.all(AppSpacing.md + 2),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        // Top row: 48x48 Uniform rounded logo tile + Star Pin Button
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            // 48x48 Uniform logo container for both real logos and placeholder icons
+                            AnimatedContainer(
+                              duration: const Duration(milliseconds: 180),
+                              width: 48,
+                              height: 48,
+                              clipBehavior: Clip.antiAlias,
+                              decoration: BoxDecoration(
+                                color: widget.color.withValues(
+                                  alpha: isDark
+                                      ? (_isHovered ? 0.24 : 0.14)
+                                      : (_isHovered ? 0.16 : 0.08),
+                                ),
+                                borderRadius: BorderRadius.circular(12),
+                                border: Border.all(
+                                  color: widget.color.withValues(
+                                    alpha: _isHovered ? 0.45 : 0.22,
+                                  ),
+                                  width: 1.2,
+                                ),
+                              ),
+                              child: Center(
+                                child: widget.imageUrl != null && widget.imageUrl!.isNotEmpty
+                                    ? Padding(
+                                        padding: const EdgeInsets.all(6.0),
+                                        child: Image.network(
+                                          widget.imageUrl!,
+                                          fit: BoxFit.contain,
+                                          width: 36,
+                                          height: 36,
+                                          errorBuilder: (context, error, stackTrace) =>
+                                              Icon(widget.icon, color: widget.color, size: 24),
+                                          loadingBuilder: (context, child, progress) {
+                                            if (progress == null) return child;
+                                            return Center(
+                                              child: SizedBox(
+                                                width: 16,
+                                                height: 16,
+                                                child: CircularProgressIndicator(
+                                                  strokeWidth: 2,
+                                                  color: widget.color,
+                                                ),
+                                              ),
+                                            );
+                                          },
+                                        ),
+                                      )
+                                    : Icon(widget.icon, color: widget.color, size: 24),
+                              ),
+                            ),
+
+                            // Star Pin button
+                            if (widget.onTogglePin != null)
+                              AnimatedOpacity(
+                                opacity: (widget.isPinned || _isHovered || _isFocused) ? 1.0 : 0.0,
+                                duration: const Duration(milliseconds: 150),
+                                child: Material(
+                                  color: Colors.transparent,
+                                  child: Tooltip(
+                                    message: widget.isPinned ? 'Unpin from favorites' : 'Pin to favorites',
+                                    child: InkWell(
+                                      onTap: widget.onTogglePin,
+                                      borderRadius: BorderRadius.circular(999),
+                                      hoverColor: AppColors.signalAmber.withValues(alpha: 0.15),
+                                      child: Padding(
+                                        padding: const EdgeInsets.all(4.0),
+                                        child: Icon(
+                                          widget.isPinned
+                                              ? Icons.star_rounded
+                                              : Icons.star_outline_rounded,
+                                          size: 20,
+                                          color: widget.isPinned
+                                              ? AppColors.signalAmber
+                                              : secondaryInk,
+                                        ),
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                              ),
+                          ],
+                        ),
+
+                        const Spacer(),
+
+                        // Portal Name
+                        Text(
+                          widget.name,
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                          style: TextStyle(
+                            fontSize: 14,
+                            fontWeight: FontWeight.w600,
+                            color: _isHovered ? widget.color : primaryInk,
+                            height: 1.25,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ],
+            ),
           ),
         ),
       ),
     );
   }
 }
+
+class PortalListTile extends StatefulWidget {
+  final String name;
+  final String url;
+  final IconData icon;
+  final Color color;
+  final VoidCallback onTap;
+  final String? tabName;
+  final String? imageUrl;
+  final bool isPinned;
+  final VoidCallback? onTogglePin;
+
+  const PortalListTile({
+    super.key,
+    required this.name,
+    required this.url,
+    required this.icon,
+    required this.color,
+    required this.onTap,
+    this.tabName,
+    this.imageUrl,
+    this.isPinned = false,
+    this.onTogglePin,
+  });
+
+  @override
+  State<PortalListTile> createState() => _PortalListTileState();
+}
+
+class _PortalListTileState extends State<PortalListTile> {
+  bool _isHovered = false;
+  bool _isFocused = false;
+
+  String _getHost() {
+    try {
+      final uri = Uri.parse(widget.url);
+      if (uri.host.isNotEmpty) return uri.host;
+    } catch (_) {}
+    return 'Web Portal';
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final host = _getHost();
+    final cleanTab = widget.tabName?.trim();
+    final showTab = cleanTab != null && cleanTab.isNotEmpty && !isPortalOwnershipLabel(cleanTab);
+    final subtitle = showTab ? '$cleanTab • $host' : host;
+
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final surfacePanel = isDark ? AppColors.darkSurfacePanel : AppColors.surfacePanel;
+    final surfaceSunken = isDark ? AppColors.darkSurfaceSunken : AppColors.surfaceSunken;
+    final lineBorder = isDark ? AppColors.darkLineHairline : AppColors.lineHairline;
+    final primaryInk = isDark ? AppColors.darkInkPrimary : AppColors.inkPrimary;
+    final secondaryInk = isDark ? AppColors.darkInkSecondary : AppColors.inkSecondary;
+
+    return MouseRegion(
+      cursor: SystemMouseCursors.click,
+      onEnter: (_) => setState(() => _isHovered = true),
+      onExit: (_) => setState(() => _isHovered = false),
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 150),
+        curve: Curves.easeOutCubic,
+        transform: Matrix4.translationValues(0, _isHovered ? -2.0 : 0.0, 0.0),
+        height: 64,
+        decoration: BoxDecoration(
+          color: surfacePanel,
+          borderRadius: BorderRadius.circular(10),
+          boxShadow: _isHovered
+              ? [
+                  BoxShadow(
+                    color: widget.color.withValues(alpha: isDark ? 0.22 : 0.14),
+                    blurRadius: 14,
+                    offset: const Offset(0, 4),
+                  ),
+                  ...AppColors.softShadow(opacity: isDark ? 0.20 : 0.06),
+                ]
+              : (_isFocused
+                  ? [
+                      BoxShadow(
+                        color: isDark
+                            ? const Color(0xFF818CF8).withValues(alpha: 0.70)
+                            : AppColors.accentIndigo.withValues(alpha: 0.45),
+                        blurRadius: 0,
+                        spreadRadius: 3,
+                      ),
+                      BoxShadow(
+                        color: AppColors.accentIndigo.withValues(alpha: 0.25),
+                        blurRadius: 10,
+                        offset: const Offset(0, 2),
+                      ),
+                    ]
+                  : AppColors.softShadow(opacity: isDark ? 0.08 : 0.03)),
+          border: Border.all(
+            color: _isFocused
+                ? (isDark ? const Color(0xFF818CF8) : AppColors.accentIndigo)
+                : (_isHovered
+                    ? widget.color.withValues(alpha: 0.45)
+                    : lineBorder.withValues(alpha: 0.8)),
+            width: _isFocused ? 2.0 : (_isHovered ? 1.4 : 1.0),
+          ),
+        ),
+        clipBehavior: Clip.antiAlias,
+        child: Material(
+          color: Colors.transparent,
+          child: InkWell(
+            onTap: widget.onTap,
+            onFocusChange: (focused) => setState(() => _isFocused = focused),
+            hoverColor: Colors.transparent,
+            splashColor: widget.color.withValues(alpha: 0.08),
+            highlightColor: widget.color.withValues(alpha: 0.04),
+            child: Row(
+              children: [
+                // Left brand accent stripe
+                AnimatedContainer(
+                  duration: const Duration(milliseconds: 150),
+                  width: _isHovered ? 5 : 4,
+                  height: double.infinity,
+                  color: widget.color,
+                ),
+                const SizedBox(width: 14),
+
+                // Icon / image badge (42x42 uniform rounded logo tile)
+                AnimatedContainer(
+                  duration: const Duration(milliseconds: 150),
+                  width: 42,
+                  height: 42,
+                  clipBehavior: Clip.antiAlias,
+                  decoration: BoxDecoration(
+                    color: widget.color.withValues(
+                      alpha: isDark
+                          ? (_isHovered ? 0.24 : 0.14)
+                          : (_isHovered ? 0.16 : 0.08),
+                    ),
+                    borderRadius: BorderRadius.circular(10),
+                    border: Border.all(
+                      color: widget.color.withValues(
+                        alpha: _isHovered ? 0.42 : 0.20,
+                      ),
+                      width: 1.0,
+                    ),
+                  ),
+                  child: Center(
+                    child: widget.imageUrl != null && widget.imageUrl!.isNotEmpty
+                        ? Padding(
+                            padding: const EdgeInsets.all(5.0),
+                            child: Image.network(
+                              widget.imageUrl!,
+                              fit: BoxFit.contain,
+                              width: 32,
+                              height: 32,
+                              errorBuilder: (context, error, stackTrace) =>
+                                  Icon(widget.icon, color: widget.color, size: 22),
+                            ),
+                          )
+                        : Icon(widget.icon, color: widget.color, size: 22),
+                  ),
+                ),
+                const SizedBox(width: 14),
+
+                // Name and subtitle
+                Expanded(
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        widget.name,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                          fontSize: 13.5,
+                          fontWeight: FontWeight.w600,
+                          color: _isHovered ? widget.color : primaryInk,
+                        ),
+                      ),
+                      const SizedBox(height: 3),
+                      Text(
+                        subtitle,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                          fontSize: 11.5,
+                          color: secondaryInk,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+
+                // Star Pin Button
+                if (widget.onTogglePin != null)
+                  Padding(
+                    padding: const EdgeInsets.only(right: 8),
+                    child: Tooltip(
+                      message: widget.isPinned ? 'Unpin from favorites' : 'Pin to favorites',
+                      child: IconButton(
+                        icon: Icon(
+                          widget.isPinned
+                              ? Icons.star_rounded
+                              : Icons.star_outline_rounded,
+                          color: widget.isPinned
+                              ? AppColors.signalAmber
+                              : AppColors.inkMuted,
+                          size: 20,
+                        ),
+                        onPressed: widget.onTogglePin,
+                      ),
+                    ),
+                  ),
+
+                // Trailing Action Launch Icon
+                Padding(
+                  padding: const EdgeInsets.only(right: 14),
+                  child: AnimatedContainer(
+                    duration: const Duration(milliseconds: 150),
+                    padding: const EdgeInsets.all(7),
+                    decoration: BoxDecoration(
+                      color: _isHovered
+                          ? widget.color.withValues(alpha: isDark ? 0.22 : 0.12)
+                          : surfaceSunken,
+                      borderRadius: BorderRadius.circular(6),
+                      border: Border.all(
+                        color: _isHovered
+                            ? widget.color.withValues(alpha: 0.35)
+                            : lineBorder,
+                      ),
+                    ),
+                    child: Icon(
+                      Icons.arrow_forward_rounded,
+                      size: 14,
+                      color: _isHovered ? widget.color : secondaryInk,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
