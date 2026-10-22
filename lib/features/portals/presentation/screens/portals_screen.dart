@@ -9,6 +9,8 @@ import '../../../../core/portal_links/portal_link_registry.dart';
 import '../../../../core/portal_links/portal_link_catalog_repository.dart';
 import '../../../../core/rbac/current_user_provider.dart';
 import '../../../../core/theme/app_theme.dart';
+import '../../../../core/theme/festive_theme_provider.dart';
+import '../../../../shared_widgets/festive/diwali_background_decorator.dart';
 import '../../../../shared_widgets/portal_link_grid.dart';
 import '../../../device_activation/presentation/controllers/device_access_controller.dart';
 import '../../../portal_auth/presentation/controllers/portal_auth_controllers.dart';
@@ -202,6 +204,9 @@ class _PortalsScreenState extends ConsumerState<PortalsScreen> {
     final lineBorder = isDark ? AppColors.darkLineHairline : AppColors.lineHairline;
 
     final localUser = ref.watch(currentUserProvider);
+    final festiveTheme = ref.watch(festiveThemeProvider);
+    final isDiwaliActive = festiveTheme == FestiveTheme.diwali;
+
     final rawName = session?.fullName.isNotEmpty == true
         ? session!.fullName
         : (session?.username.isNotEmpty == true
@@ -212,7 +217,7 @@ class _PortalsScreenState extends ConsumerState<PortalsScreen> {
                     ? localUser!.username
                     : 'User')));
 
-    return Column(
+    final content = Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         // Greeting Header (Phase B)
@@ -226,18 +231,64 @@ class _PortalsScreenState extends ConsumerState<PortalsScreen> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(
-                      '${_getGreeting()}, $rawName',
-                      style: TextStyle(
-                        fontSize: 22,
-                        fontWeight: FontWeight.w700,
-                        color: primaryInk,
-                        letterSpacing: -0.3,
-                      ),
+                    Row(
+                      crossAxisAlignment: CrossAxisAlignment.center,
+                      children: [
+                        Text(
+                          isDiwaliActive
+                              ? '🪔 Happy Diwali, $rawName ✨'
+                              : '${_getGreeting()}, $rawName',
+                          style: TextStyle(
+                            fontSize: 22,
+                            fontWeight: FontWeight.w700,
+                            color: isDiwaliActive
+                                ? (isDark ? const Color(0xFFFBBF24) : const Color(0xFFB45309))
+                                : primaryInk,
+                            letterSpacing: -0.3,
+                          ),
+                        ),
+                        if (isDiwaliActive) ...[
+                          const SizedBox(width: 10),
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2.5),
+                            decoration: BoxDecoration(
+                              gradient: const LinearGradient(
+                                colors: [Color(0xFFF59E0B), Color(0xFFEA580C)],
+                              ),
+                              borderRadius: BorderRadius.circular(999),
+                              boxShadow: [
+                                BoxShadow(
+                                  color: const Color(0xFFF59E0B).withValues(alpha: 0.35),
+                                  blurRadius: 6,
+                                  offset: const Offset(0, 2),
+                                ),
+                              ],
+                            ),
+                            child: const Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Icon(Icons.auto_awesome, size: 11, color: Colors.white),
+                                SizedBox(width: 4),
+                                Text(
+                                  'Diwali Edition',
+                                  style: TextStyle(
+                                    fontSize: 10.5,
+                                    fontWeight: FontWeight.w700,
+                                    color: Colors.white,
+                                    letterSpacing: 0.2,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
+                      ],
                     ),
                     const SizedBox(height: 3),
                     Text(
-                      'Launch and manage your company portals and services',
+                      isDiwaliActive
+                          ? 'Wishing you happiness, prosperity, and light. Launch your services below.'
+                          : 'Launch and manage your company portals and services',
                       style: TextStyle(
                         fontSize: 12.5,
                         color: secondaryInk,
@@ -430,6 +481,15 @@ class _PortalsScreenState extends ConsumerState<PortalsScreen> {
         ),
       ],
     );
+
+    if (isDiwaliActive) {
+      return DiwaliBackgroundDecorator(
+        isDark: isDark,
+        child: content,
+      );
+    }
+
+    return content;
   }
 }
 

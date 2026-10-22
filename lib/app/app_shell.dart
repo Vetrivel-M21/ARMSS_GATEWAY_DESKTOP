@@ -7,6 +7,7 @@ import '../core/constants/permission_keys.dart';
 import '../core/rbac/current_user_provider.dart';
 import '../core/theme/app_theme.dart';
 import '../core/theme/theme_mode_provider.dart';
+import '../core/theme/festive_theme_provider.dart';
 import '../features/dinesh_portal/presentation/screens/dinesh_portal_screen.dart';
 import '../features/kavi_manju_portal/presentation/screens/kavi_manju_portal_screen.dart';
 import '../features/other_portals/presentation/screens/other_portals_screen.dart';
@@ -340,6 +341,20 @@ class _TopBar extends ConsumerWidget {
               ),
             ),
           ),
+          const SizedBox(width: AppSpacing.xs),
+          Builder(builder: (context) {
+            final festiveTheme = ref.watch(festiveThemeProvider);
+            final isDiwali = festiveTheme == FestiveTheme.diwali;
+            return IconButton(
+              icon: Icon(
+                isDiwali ? Icons.celebration_rounded : Icons.celebration_outlined,
+                size: 20,
+                color: isDiwali ? const Color(0xFFF59E0B) : secondaryInk,
+              ),
+              tooltip: isDiwali ? 'Diwali Theme Active (Click to Disable)' : 'Enable Diwali Festive Theme',
+              onPressed: () => ref.read(festiveThemeProvider.notifier).toggleDiwali(),
+            );
+          }),
           const SizedBox(width: AppSpacing.xs),
           IconButton(
             icon: Icon(
