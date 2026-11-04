@@ -9,7 +9,6 @@ import '../../../../core/database/app_database.dart';
 import '../../../../core/rbac/current_user_provider.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../../../core/theme/theme_mode_provider.dart';
-import '../../../../core/theme/festive_theme_provider.dart';
 import '../../../../core/updates/app_update_service.dart';
 import '../../../portal_admin/presentation/screens/portal_users_admin_screen.dart';
 import '../../../portal_auth/presentation/controllers/portal_auth_controllers.dart';
@@ -642,8 +641,6 @@ class _UserProfileScreenState extends ConsumerState<UserProfileScreen> {
 
   Widget _buildAppearanceCard(BuildContext context) {
     final themeMode = ref.watch(themeModeProvider);
-    final festiveTheme = ref.watch(festiveThemeProvider);
-    final isDiwali = festiveTheme == FestiveTheme.diwali;
     final isDark = themeMode == ThemeMode.dark;
 
     return Card(
@@ -678,7 +675,7 @@ class _UserProfileScreenState extends ConsumerState<UserProfileScreen> {
                         style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: _primaryInk),
                       ),
                       Text(
-                        'Customize color schemes and seasonal festive experiences',
+                        'Customize color schemes and display options',
                         style: TextStyle(fontSize: 12, color: _secondaryInk),
                       ),
                     ],
@@ -713,83 +710,6 @@ class _UserProfileScreenState extends ConsumerState<UserProfileScreen> {
                     value: isDark,
                     activeTrackColor: AppColors.accentIndigo,
                     onChanged: (_) => ref.read(themeModeProvider.notifier).toggleTheme(),
-                  ),
-                ],
-              ),
-            ),
-            const SizedBox(height: 10),
-            // Diwali Festive Theme row
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-              decoration: BoxDecoration(
-                color: isDiwali
-                    ? (isDark
-                        ? const Color(0xFF1E1035)
-                        : const Color(0xFFFFF9ED))
-                    : _surfaceSunken,
-                borderRadius: BorderRadius.circular(10),
-                border: Border.all(
-                  color: isDiwali
-                      ? const Color(0xFFF59E0B).withValues(alpha: 0.4)
-                      : _lineBorder,
-                ),
-              ),
-              child: Row(
-                children: [
-                  const Icon(
-                    Icons.celebration_rounded,
-                    size: 18,
-                    color: Color(0xFFF59E0B),
-                  ),
-                  const SizedBox(width: 10),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Row(
-                          children: [
-                            Text(
-                              '🪔 Diwali Festive Theme',
-                              style: TextStyle(
-                                fontSize: 13,
-                                fontWeight: FontWeight.w600,
-                                color: isDiwali
-                                    ? (isDark ? const Color(0xFFFBBF24) : const Color(0xFFB45309))
-                                    : _primaryInk,
-                              ),
-                            ),
-                            if (isDiwali) ...[
-                              const SizedBox(width: 6),
-                              Container(
-                                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1),
-                                decoration: BoxDecoration(
-                                  color: const Color(0xFFF59E0B),
-                                  borderRadius: BorderRadius.circular(4),
-                                ),
-                                child: const Text(
-                                  'ACTIVE',
-                                  style: TextStyle(
-                                    fontSize: 9,
-                                    fontWeight: FontWeight.w700,
-                                    color: Colors.white,
-                                  ),
-                                ),
-                              ),
-                            ],
-                          ],
-                        ),
-                        const SizedBox(height: 2),
-                        Text(
-                          'Ambient warm glow, corner rangoli mandalas, and festive greetings',
-                          style: TextStyle(fontSize: 11.5, color: _secondaryInk),
-                        ),
-                      ],
-                    ),
-                  ),
-                  Switch.adaptive(
-                    value: isDiwali,
-                    activeTrackColor: const Color(0xFFF59E0B),
-                    onChanged: (_) => ref.read(festiveThemeProvider.notifier).toggleDiwali(),
                   ),
                 ],
               ),

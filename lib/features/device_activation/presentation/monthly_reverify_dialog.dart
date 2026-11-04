@@ -1,19 +1,22 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../../core/device_auth/device_token_repository.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../../../shared_widgets/gradient_filled_button.dart';
+import 'controllers/device_access_controller.dart';
 
-class MonthlyReverifyDialog extends StatefulWidget {
+class MonthlyReverifyDialog extends ConsumerStatefulWidget {
   final String deviceId;
 
   const MonthlyReverifyDialog({super.key, required this.deviceId});
 
   @override
-  State<MonthlyReverifyDialog> createState() => _MonthlyReverifyDialogState();
+  ConsumerState<MonthlyReverifyDialog> createState() =>
+      _MonthlyReverifyDialogState();
 }
 
-class _MonthlyReverifyDialogState extends State<MonthlyReverifyDialog> {
+class _MonthlyReverifyDialogState extends ConsumerState<MonthlyReverifyDialog> {
   final _repository = DeviceTokenRepository();
   final _otpController = TextEditingController();
 
@@ -21,6 +24,13 @@ class _MonthlyReverifyDialogState extends State<MonthlyReverifyDialog> {
   String? _requestId;
   String? _maskedEmail;
   String? _errorMessage;
+
+  // Flow stages:
+  // 1: OTP Entry
+  // 2: Need Admin Approval (OTP verified, awaiting user click on 'Request Approve')
+  // 3: Request Submitted (waiting for admin to approve)
+  bool _isOtpVerified = false;
+  bool _isApprovalSubmitted = false;
 
   @override
   void initState() {
@@ -82,18 +92,62 @@ class _MonthlyReverifyDialogState extends State<MonthlyReverifyDialog> {
     setState(() => _isLoading = false);
 
     if (result.isSuccess && result.valueOrNull == true) {
-      Navigator.of(context)
-          .pop(true); // Return true to indicate successful unlock
+      // OTP verified! Transition to "Need Admin Approval" stage
+      setState(() {
+        _isOtpVerified = true;
+        _errorMessage = null;
+      });
     } else {
       setState(() {
         _errorMessage =
-            'Incorrect or expired verification code. Please try again.';
+            'Incorrect or expired verification code. Please check your email and try again.';
+      });
+    }
+  }
+
+  Future<void> _requestApproval() async {
+    setState(() {
+      _isLoading = true;
+      _errorMessage = null;
+    });
+
+    final result = await _repository.requestMonthlyApproval(
+      deviceId: widget.deviceId,
+      requestId: _requestId ?? '',
+    );
+
+    if (!mounted) return;
+    setState(() => _isLoading = false);
+
+    if (result.isSuccess && result.valueOrNull == true) {
+      ref
+          .read(deviceAccessControllerProvider.notifier)
+          .setMonthlyApprovalPending(_requestId ?? '');
+
+      setState(() {
+        _isApprovalSubmitted = true;
+      });
+    } else {
+      setState(() {
+        _errorMessage =
+            result.errorOrNull?.message ?? 'Failed to submit approval request.';
       });
     }
   }
 
   @override
   Widget build(BuildContext context) {
+    if (_isApprovalSubmitted) {
+      return _buildSubmittedView();
+    }
+    if (_isOtpVerified) {
+      return _buildNeedAdminApprovalView();
+    }
+    return _buildOtpEntryView();
+  }
+
+  // ── Stage 1: Enter OTP sent to user email ──────────────────────────────────
+  Widget _buildOtpEntryView() {
     return AlertDialog(
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
       title: Row(
@@ -118,7 +172,7 @@ class _MonthlyReverifyDialogState extends State<MonthlyReverifyDialog> {
         ],
       ),
       content: SizedBox(
-        width: 420,
+        width: 440,
         child: Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -146,7 +200,7 @@ class _MonthlyReverifyDialogState extends State<MonthlyReverifyDialog> {
                     const SizedBox(width: 8),
                     Expanded(
                       child: Text(
-                        'Code sent to: $_maskedEmail',
+                        'Code sent to your email: $_maskedEmail',
                         style: const TextStyle(
                           fontSize: 12,
                           fontWeight: FontWeight.w500,
@@ -213,7 +267,179 @@ class _MonthlyReverifyDialogState extends State<MonthlyReverifyDialog> {
         ),
         GradientFilledButton(
           onPressed: _isLoading ? null : _verifyOtp,
-          child: const Text('Verify & Unlock'),
+          child: const Text('Verify OTP'),
+        ),
+      ],
+    );
+  }
+
+  // ── Stage 2: Need Admin Approval Dialog ────────────────────────────────────
+  Widget _buildNeedAdminApprovalView() {
+    return AlertDialog(
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+      title: Row(
+        children: [
+          Container(
+            padding: const EdgeInsets.all(8),
+            decoration: BoxDecoration(
+              color: AppColors.signalAmber.withValues(alpha: 0.15),
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: const Icon(
+              Icons.admin_panel_settings_outlined,
+              color: AppColors.signalAmber,
+              size: 24,
+            ),
+          ),
+          const SizedBox(width: AppSpacing.md),
+          const Text(
+            'Need Admin Approval',
+            style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18),
+          ),
+        ],
+      ),
+      content: SizedBox(
+        width: 440,
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+              decoration: BoxDecoration(
+                color: AppColors.signalSuccess.withValues(alpha: 0.1),
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(
+                  color: AppColors.signalSuccess.withValues(alpha: 0.3),
+                ),
+              ),
+              child: const Row(
+                children: [
+                  Icon(
+                    Icons.check_circle_outline,
+                    color: AppColors.signalSuccess,
+                    size: 20,
+                  ),
+                  SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      'Email OTP verified successfully!',
+                      style: TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w600,
+                        color: AppColors.signalSuccess,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: AppSpacing.md),
+            const Text(
+              'Administrator approval is now required to restore access to company web portals.',
+              style: TextStyle(fontSize: 13, color: AppColors.inkPrimary),
+            ),
+            const SizedBox(height: 8),
+            const Text(
+              'Click "Request Approve" below to submit this verification request to the administrator. In the meantime, access to web portals remains restricted.',
+              style: TextStyle(fontSize: 12, color: AppColors.inkMuted),
+            ),
+            if (_errorMessage != null) ...[
+              const SizedBox(height: AppSpacing.sm),
+              Text(
+                _errorMessage!,
+                style: const TextStyle(
+                  fontSize: 12,
+                  color: AppColors.signalError,
+                ),
+              ),
+            ],
+            if (_isLoading) ...[
+              const SizedBox(height: AppSpacing.md),
+              const Center(child: CircularProgressIndicator()),
+            ],
+          ],
+        ),
+      ),
+      actionsPadding: const EdgeInsets.fromLTRB(
+        AppSpacing.lg,
+        0,
+        AppSpacing.lg,
+        AppSpacing.lg,
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.of(context).pop(false),
+          child: const Text('Cancel'),
+        ),
+        GradientFilledButton(
+          onPressed: _isLoading ? null : _requestApproval,
+          child: const Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(Icons.send_rounded, size: 16),
+              SizedBox(width: 6),
+              Text('Request Approve'),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+
+  // ── Stage 3: Request Submitted Confirmation ────────────────────────────────
+  Widget _buildSubmittedView() {
+    return AlertDialog(
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+      title: Row(
+        children: [
+          Container(
+            padding: const EdgeInsets.all(8),
+            decoration: BoxDecoration(
+              color: AppColors.signalAmber.withValues(alpha: 0.15),
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: const Icon(
+              Icons.hourglass_top_rounded,
+              color: AppColors.signalAmber,
+              size: 24,
+            ),
+          ),
+          const SizedBox(width: AppSpacing.md),
+          const Text(
+            'Request Sent to Admin',
+            style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18),
+          ),
+        ],
+      ),
+      content: const SizedBox(
+        width: 440,
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'Your monthly verification request has been successfully sent to the administrator.',
+              style: TextStyle(fontSize: 13, color: AppColors.inkPrimary),
+            ),
+            SizedBox(height: 10),
+            Text(
+              'In the meantime, access to web portals remains locked. Once the admin approves your request, click the "Check Status" button in the header bar to unlock access.',
+              style: TextStyle(fontSize: 12, color: AppColors.inkMuted),
+            ),
+          ],
+        ),
+      ),
+      actionsPadding: const EdgeInsets.fromLTRB(
+        AppSpacing.lg,
+        0,
+        AppSpacing.lg,
+        AppSpacing.lg,
+      ),
+      actions: [
+        GradientFilledButton(
+          onPressed: () => Navigator.of(context).pop(true),
+          child: const Text('OK'),
         ),
       ],
     );

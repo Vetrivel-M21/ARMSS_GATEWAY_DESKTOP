@@ -10,6 +10,7 @@ import '../../../core/errors/result.dart';
 import '../domain/entities/admin_activation_request.dart';
 import '../domain/entities/admin_audit_log.dart';
 import '../domain/entities/admin_device.dart';
+import '../domain/entities/admin_monthly_request.dart';
 import '../domain/entities/admin_portal_user.dart';
 import '../domain/entities/admin_portal_link.dart';
 import '../domain/repositories/portal_admin_repository.dart';
@@ -460,6 +461,23 @@ class PortalAdminRepositoryImpl implements PortalAdminRepository {
   }
 
   @override
+  Future<Result<void>> unlockDevice(String deviceId) async {
+    try {
+      final response = await http
+          .post(_uri('/admin/devices/$deviceId/unlock'), headers: _headers)
+          .timeout(const Duration(seconds: 10));
+      final body = jsonDecode(response.body) as Map<String, dynamic>;
+      if (body['success'] != true) {
+        final msg = body['error']?['message'] as String? ?? 'Unable to unlock device.';
+        return Failure(NetworkException(msg));
+      }
+      return const Success(null);
+    } catch (e) {
+      return Failure(NetworkException('Failed to unlock device: $e'));
+    }
+  }
+
+  @override
   Future<Result<void>> assignDeviceUser({
     required String deviceId,
     required int userId,
@@ -575,6 +593,102 @@ class PortalAdminRepositoryImpl implements PortalAdminRepository {
       return const Success(null);
     } catch (e) {
       return Failure(NetworkException('Failed to reject request: $e'));
+    }
+  }
+
+  @override
+  Future<Result<List<AdminMonthlyRequest>>> listMonthlyRequests([
+    String? status,
+  ]) async {
+    try {
+      final query = <String, dynamic>{};
+      if (status != null && status.isNotEmpty) query['status'] = status;
+      final response = await http
+          .get(_uri('/portal/admin/monthly-requests', query), headers: _headers)
+          .timeout(const Duration(seconds: 10));
+      final body = jsonDecode(response.body) as Map<String, dynamic>;
+      if (body['success'] != true) {
+        return const Failure(
+          NetworkException('Unable to load monthly verification requests.'),
+        );
+      }
+      final rawList = (body['data'] as List).cast<Map<String, dynamic>>();
+      return Success([
+        for (final r in rawList)
+          AdminMonthlyRequest(
+            id: r['id'] as String,
+            userId: (r['user_id'] as num).toInt(),
+            username: r['username'] as String? ?? '',
+            fullName: r['full_name'] as String? ?? '',
+            email: r['email'] as String? ?? '',
+            department: r['department'] as String? ?? '',
+            branch: r['branch'] as String? ?? '',
+            deviceId: r['device_id'] as String? ?? '',
+            machineFingerprint: r['machine_fingerprint'] as String? ?? '',
+            otpVerified: r['otp_verified'] == true,
+            otpVerifiedAt: r['otp_verified_at'] != null
+                ? DateTime.tryParse(r['otp_verified_at'].toString())
+                : null,
+            status: r['status'] as String? ?? 'pending_approval',
+            approvedBy: (r['approved_by'] as num?)?.toInt(),
+            approverName: r['approver_name'] as String?,
+            approvedAt: r['approved_at'] != null
+                ? DateTime.tryParse(r['approved_at'].toString())
+                : null,
+            rejectionReason: r['rejection_reason'] as String?,
+            requestedAt: DateTime.tryParse(r['requested_at']?.toString() ?? '') ??
+                DateTime.now(),
+            createdAt: DateTime.tryParse(r['created_at']?.toString() ?? '') ??
+                DateTime.now(),
+          ),
+      ]);
+    } catch (e) {
+      return Failure(
+        NetworkException('Failed to load monthly verification requests: $e'),
+      );
+    }
+  }
+
+  @override
+  Future<Result<void>> approveMonthlyRequest(String requestId) async {
+    try {
+      final response = await http
+          .post(_uri('/portal/admin/monthly-requests/$requestId/approve'), headers: _headers)
+          .timeout(const Duration(seconds: 10));
+      final body = jsonDecode(response.body) as Map<String, dynamic>;
+      if (body['success'] != true) {
+        return const Failure(
+          NetworkException('Unable to approve monthly verification request.'),
+        );
+      }
+      return const Success(null);
+    } catch (e) {
+      return Failure(NetworkException('Failed to approve monthly request: $e'));
+    }
+  }
+
+  @override
+  Future<Result<void>> rejectMonthlyRequest(
+    String requestId, {
+    String? reason,
+  }) async {
+    try {
+      final response = await http
+          .post(
+            _uri('/portal/admin/monthly-requests/$requestId/reject'),
+            headers: _headers,
+            body: jsonEncode({'reason': reason ?? ''}),
+          )
+          .timeout(const Duration(seconds: 10));
+      final body = jsonDecode(response.body) as Map<String, dynamic>;
+      if (body['success'] != true) {
+        return const Failure(
+          NetworkException('Unable to reject monthly verification request.'),
+        );
+      }
+      return const Success(null);
+    } catch (e) {
+      return Failure(NetworkException('Failed to reject monthly request: $e'));
     }
   }
 

@@ -41,6 +41,26 @@ class MonthlyOtpRequestResult {
   });
 }
 
+class MonthlyStatusCheckResult {
+  final String status; // 'pending_otp', 'pending_approval', 'approved', 'rejected', 'none'
+  final bool isReverifyRequired;
+  final String? requestId;
+  final String? reason;
+  final DateTime? requestedAt;
+  final DateTime? approvedAt;
+  final String? rejectionReason;
+
+  const MonthlyStatusCheckResult({
+    required this.status,
+    this.isReverifyRequired = false,
+    this.requestId,
+    this.reason,
+    this.requestedAt,
+    this.approvedAt,
+    this.rejectionReason,
+  });
+}
+
 class DeviceTokenRepository {
   Uri _uri(String path, [Map<String, dynamic>? queryParams]) {
     final base = Uri.parse('${GatewayApiClient.apiBaseUrl}$path');
@@ -219,6 +239,68 @@ class DeviceTokenRepository {
       return Success(data['verified'] == true);
     } catch (e) {
       return Failure(NetworkException('Failed to verify OTP: $e'));
+    }
+  }
+
+  Future<Result<bool>> requestMonthlyApproval({
+    required String deviceId,
+    required String requestId,
+  }) async {
+    try {
+      final body = await _post('/auth/monthly-reverify/request-approval', {
+        'device_id': deviceId,
+        'request_id': requestId,
+      });
+
+      if (body['success'] != true) {
+        final err = (body['error'] as Map<String, dynamic>?)?['message'] as String? ??
+            'Failed to request approval.';
+        return Failure(NetworkException(err));
+      }
+
+      final data = body['data'] as Map<String, dynamic>? ?? {};
+      return Success(data['success'] == true);
+    } catch (e) {
+      return Failure(NetworkException('Failed to submit approval request: $e'));
+    }
+  }
+
+  Future<Result<MonthlyStatusCheckResult>> checkMonthlyStatus({
+    required String deviceId,
+  }) async {
+    try {
+      final body = await _get(
+        '/auth/monthly-reverify/check-status',
+        queryParams: {'device_id': deviceId},
+      );
+
+      if (body['success'] != true) {
+        return const Success(MonthlyStatusCheckResult(status: 'none'));
+      }
+
+      final data = body['data'] as Map<String, dynamic>? ?? {};
+      DateTime? reqAt;
+      if (data['requested_at'] != null) {
+        reqAt = DateTime.tryParse(data['requested_at'].toString());
+      }
+      DateTime? appAt;
+      if (data['approved_at'] != null) {
+        appAt = DateTime.tryParse(data['approved_at'].toString());
+      }
+
+      return Success(
+        MonthlyStatusCheckResult(
+          status: data['status'] as String? ?? 'none',
+          isReverifyRequired: data['is_reverify_required'] == true,
+          requestId: data['request_id'] as String?,
+          reason: data['reason'] as String?,
+          requestedAt: reqAt,
+          approvedAt: appAt,
+          rejectionReason: data['rejection_reason'] as String?,
+        ),
+      );
+    } catch (e) {
+      return Failure(NetworkException('Failed to check monthly verification status: $e'));
     }
   }
 }

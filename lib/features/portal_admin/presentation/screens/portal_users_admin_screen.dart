@@ -18,6 +18,7 @@ import '../../domain/entities/admin_portal_link.dart';
 import '../../domain/entities/portal_link_catalog.dart';
 import '../../domain/repositories/portal_admin_repository.dart';
 import '../../../portal_auth/presentation/controllers/portal_auth_controllers.dart';
+import '../../../../core/device_auth/device_account_binding_service.dart';
 import 'portal_link_form_dialog.dart';
 
 final portalAdminRepositoryProvider = Provider<PortalAdminRepository>(
@@ -453,6 +454,14 @@ class _PortalUsersAdminScreenState extends ConsumerState<PortalUsersAdminScreen>
         .releaseDeviceLock(user.id);
     if (!mounted) return;
     if (result.isSuccess) {
+      // If the current device was bound to this released user, purge local client binding cache
+      final bindingService = ref.read(deviceAccountBindingServiceProvider);
+      final bound = await bindingService.getBoundAccount();
+      if (bound != null && (bound.userId == user.id || bound.username.toLowerCase() == user.username.toLowerCase())) {
+        await bindingService.clearBinding();
+      }
+
+      if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text('Device lock released for "${user.fullName}".'),
@@ -508,6 +517,50 @@ class _PortalUsersAdminScreenState extends ConsumerState<PortalUsersAdminScreen>
         SnackBar(
           content: Text(
             result.errorOrNull?.message ?? 'Failed to revoke token.',
+          ),
+        ),
+      );
+    }
+  }
+
+  Future<void> _unlockDevice(AdminDevice device) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (_) => AlertDialog(
+        title: const Text('Unlock Device?'),
+        content: Text(
+          'Are you sure you want to unlock access for device "${device.deviceId}" (${device.machineFingerprint.isNotEmpty ? device.machineFingerprint : "Windows PC"}) belonging to ${device.fullName.isNotEmpty ? device.fullName : device.username}?\n\nThis will re-activate the device token and refresh monthly verification immediately.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(false),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            style: FilledButton.styleFrom(backgroundColor: AppColors.signalCredit),
+            onPressed: () => Navigator.of(context).pop(true),
+            child: const Text('Unlock Device'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed != true || !mounted) return;
+
+    final result = await ref
+        .read(portalAdminRepositoryProvider)
+        .unlockDevice(device.deviceId);
+    if (!mounted) return;
+    if (result.isSuccess) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Device unlocked successfully!')),
+      );
+      _loadDevices();
+    } else {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            result.errorOrNull?.message ?? 'Failed to unlock device.',
           ),
         ),
       );
@@ -1595,24 +1648,14 @@ class _PortalUsersAdminScreenState extends ConsumerState<PortalUsersAdminScreen>
                         label: const Text('Revoke'),
                       )
                     else
-                      Container(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 10,
-                          vertical: 6,
+                      OutlinedButton.icon(
+                        style: OutlinedButton.styleFrom(
+                          foregroundColor: AppColors.signalCredit,
+                          side: const BorderSide(color: AppColors.signalCredit),
                         ),
-                        decoration: BoxDecoration(
-                          color: _surfaceSunken,
-                          borderRadius: BorderRadius.circular(6),
-                          border: Border.all(color: _lineBorder),
-                        ),
-                        child: Text(
-                          'Revoked',
-                          style: TextStyle(
-                            fontSize: 12,
-                            color: _mutedInk,
-                            fontWeight: FontWeight.w600,
-                          ),
-                        ),
+                        onPressed: () => _unlockDevice(device),
+                        icon: const Icon(Icons.lock_open, size: 16),
+                        label: const Text('Unlock'),
                       ),
                   ],
                 ),

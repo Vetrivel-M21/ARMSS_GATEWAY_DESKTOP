@@ -104,20 +104,6 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
     final identifier = _usernameController.text.trim();
     final password = _passwordController.text;
 
-    // Check device binding
-    final bindingService = ref.read(deviceAccountBindingServiceProvider);
-    final isAllowed = await bindingService.isIdentifierAllowed(identifier);
-    if (!isAllowed) {
-      final bound = await bindingService.getBoundAccount();
-      final name = bound?.displayName ?? 'another account';
-      setState(() {
-        _isSubmitting = false;
-        _errorMessage =
-            'This device is registered to "$name". To switch accounts, please release the device lock in the Admin Portal.';
-      });
-      return;
-    }
-
     final portalResult = await ref
         .read(portalSessionControllerProvider.notifier)
         .login(identifier: identifier, password: password);
@@ -449,7 +435,6 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
   /// Single feature bullet in left brand panel
   Widget _buildBrandFeatureRow(IconData icon, String label) {
     return Row(
-      mainAxisSize: MainAxisSize.min,
       children: [
         Container(
           padding: const EdgeInsets.all(4),
@@ -464,13 +449,15 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
           ),
         ),
         const SizedBox(width: 10),
-        Text(
-          label,
-          style: TextStyle(
-            fontSize: 13,
-            fontWeight: FontWeight.w500,
-            color: Colors.white.withValues(alpha: 0.88),
-            letterSpacing: 0.1,
+        Expanded(
+          child: Text(
+            label,
+            style: TextStyle(
+              fontSize: 13,
+              fontWeight: FontWeight.w500,
+              color: Colors.white.withValues(alpha: 0.88),
+              letterSpacing: 0.1,
+            ),
           ),
         ),
       ],

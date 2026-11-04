@@ -3,6 +3,7 @@ import 'dart:io';
 import '../entities/admin_activation_request.dart';
 import '../entities/admin_audit_log.dart';
 import '../entities/admin_device.dart';
+import '../entities/admin_monthly_request.dart';
 import '../entities/admin_portal_user.dart';
 import '../entities/admin_portal_link.dart';
 
@@ -35,6 +36,7 @@ abstract class PortalAdminRepository {
 
   Future<Result<List<AdminDevice>>> listDevices();
   Future<Result<void>> revokeDevice(String deviceId);
+  Future<Result<void>> unlockDevice(String deviceId);
   Future<Result<void>> assignDeviceUser({
     required String deviceId,
     required int userId,
@@ -45,6 +47,14 @@ abstract class PortalAdminRepository {
   ]);
   Future<Result<void>> approveActivationRequest(String requestId);
   Future<Result<void>> rejectActivationRequest(
+    String requestId, {
+    String? reason,
+  });
+  Future<Result<List<AdminMonthlyRequest>>> listMonthlyRequests([
+    String? status,
+  ]);
+  Future<Result<void>> approveMonthlyRequest(String requestId);
+  Future<Result<void>> rejectMonthlyRequest(
     String requestId, {
     String? reason,
   });

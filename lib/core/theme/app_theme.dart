@@ -38,6 +38,7 @@ class AppColors {
 
   static const signalDebit = Color(0xFFDC2626);
   static const signalCredit = Color(0xFF16A34A);
+  static const signalSuccess = Color(0xFF16A34A);
   static const signalError = Color(0xFFDC2626);
   static const signalAmber = Color(0xFFD97706);
 
@@ -141,29 +142,6 @@ class AppShadows {
       ];
 }
 
-/// Festive Diwali design tokens for rich, ambient presentation on the user side.
-class DiwaliColors {
-  DiwaliColors._();
-
-  static const goldPrimary = Color(0xFFF59E0B);
-  static const goldAmber = Color(0xFFD97706);
-  static const goldGlow = Color(0xFFFBBF24);
-  static const flameWarm = Color(0xFFFDE68A);
-  static const marigoldSaffron = Color(0xFFEA580C);
-  static const festiveRuby = Color(0xFFE11D48);
-
-  // Dark festive surfaces
-  static const darkCanvas = Color(0xFF130B24);
-  static const darkPanel = Color(0xFF1D1236);
-  static const darkSunken = Color(0xFF0D0619);
-  static const darkBorder = Color(0xFF38235C);
-
-  // Light festive surfaces
-  static const lightCanvas = Color(0xFFFFFDF8);
-  static const lightPanel = Color(0xFFFFFFFF);
-  static const lightSunken = Color(0xFFFFF9ED);
-  static const lightBorder = Color(0xFFFDE68A);
-}
 
 /// Consistent spacing scale used across the app (padding, gaps).
 class AppSpacing {

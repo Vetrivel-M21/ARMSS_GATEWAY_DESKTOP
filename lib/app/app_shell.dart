@@ -7,11 +7,11 @@ import '../core/constants/permission_keys.dart';
 import '../core/rbac/current_user_provider.dart';
 import '../core/theme/app_theme.dart';
 import '../core/theme/theme_mode_provider.dart';
-import '../core/theme/festive_theme_provider.dart';
 import '../features/dinesh_portal/presentation/screens/dinesh_portal_screen.dart';
 import '../features/kavi_manju_portal/presentation/screens/kavi_manju_portal_screen.dart';
 import '../features/other_portals/presentation/screens/other_portals_screen.dart';
 import '../features/portal_admin/presentation/screens/admin_audit_logs_screen.dart';
+import '../features/portal_admin/presentation/screens/monthly_otp_verification_screen.dart';
 import '../features/portal_admin/presentation/screens/portal_users_admin_screen.dart';
 import '../features/portal_auth/presentation/controllers/portal_auth_controllers.dart';
 import '../features/portals/presentation/screens/portals_screen.dart';
@@ -135,6 +135,13 @@ class _AppShellState extends ConsumerState<AppShell> {
         label: 'Portal Users',
         icon: Icons.admin_panel_settings_outlined,
         screen: PortalUsersAdminScreen(),
+        section: 'ADMINISTRATION',
+      ),
+      const _NavEntry(
+        key: 'monthly_otp_verification',
+        label: 'Monthly OTP Verification',
+        icon: Icons.verified_user_outlined,
+        screen: MonthlyOtpVerificationScreen(),
         section: 'ADMINISTRATION',
       ),
       const _NavEntry(
@@ -312,6 +319,41 @@ class _TopBar extends ConsumerWidget {
           _welcomeBadge(username, isDark),
           const SizedBox(width: AppSpacing.sm),
           if (activeKey == 'balance_entry') const _DayStatusBadge(),
+          if (ref.watch(deviceAccessControllerProvider).isMonthlyApprovalPending ||
+              ref.watch(deviceAccessControllerProvider).reason == 'monthly_approval_pending') ...[
+            const SizedBox(width: AppSpacing.sm),
+            OutlinedButton.icon(
+              style: OutlinedButton.styleFrom(
+                foregroundColor: const Color(0xFFD97706),
+                side: const BorderSide(color: Color(0xFFD97706), width: 1.5),
+                backgroundColor: isDark ? const Color(0xFF451A03) : const Color(0xFFFEF3C7),
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                visualDensity: VisualDensity.compact,
+                textStyle: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold),
+              ),
+              icon: const Icon(Icons.sync, size: 14),
+              label: const Text('Check Status'),
+              onPressed: () async {
+                final approved = await ref
+                    .read(deviceAccessControllerProvider.notifier)
+                    .pollMonthlyApproval();
+                if (context.mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: Text(
+                        approved
+                            ? 'Admin approved! Web portals are now accessible.'
+                            : 'Still pending administrator approval. Please check again shortly.',
+                      ),
+                      backgroundColor: approved
+                          ? AppColors.signalSuccess
+                          : AppColors.signalAmber,
+                    ),
+                  );
+                }
+              },
+            ),
+          ],
           const Spacer(),
           InkWell(
             onTap: () {
@@ -341,20 +383,6 @@ class _TopBar extends ConsumerWidget {
               ),
             ),
           ),
-          const SizedBox(width: AppSpacing.xs),
-          Builder(builder: (context) {
-            final festiveTheme = ref.watch(festiveThemeProvider);
-            final isDiwali = festiveTheme == FestiveTheme.diwali;
-            return IconButton(
-              icon: Icon(
-                isDiwali ? Icons.celebration_rounded : Icons.celebration_outlined,
-                size: 20,
-                color: isDiwali ? const Color(0xFFF59E0B) : secondaryInk,
-              ),
-              tooltip: isDiwali ? 'Diwali Theme Active (Click to Disable)' : 'Enable Diwali Festive Theme',
-              onPressed: () => ref.read(festiveThemeProvider.notifier).toggleDiwali(),
-            );
-          }),
           const SizedBox(width: AppSpacing.xs),
           IconButton(
             icon: Icon(

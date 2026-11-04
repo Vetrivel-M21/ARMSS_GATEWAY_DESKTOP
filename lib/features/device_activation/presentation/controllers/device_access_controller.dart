@@ -6,6 +6,8 @@ import '../../../../core/device_auth/device_token_repository.dart';
 class DeviceAccessState {
   final bool isRevoked;
   final bool isOtpReverifyRequired;
+  final bool isMonthlyApprovalPending;
+  final String? monthlyRequestId;
   final bool isLoading;
   final String? reason;
   final String deviceId;
@@ -17,6 +19,8 @@ class DeviceAccessState {
   const DeviceAccessState({
     this.isRevoked = false,
     this.isOtpReverifyRequired = false,
+    this.isMonthlyApprovalPending = false,
+    this.monthlyRequestId,
     this.isLoading = false,
     this.reason,
     this.deviceId = '',
@@ -29,6 +33,8 @@ class DeviceAccessState {
   DeviceAccessState copyWith({
     bool? isRevoked,
     bool? isOtpReverifyRequired,
+    bool? isMonthlyApprovalPending,
+    String? monthlyRequestId,
     bool? isLoading,
     String? reason,
     String? deviceId,
@@ -41,6 +47,9 @@ class DeviceAccessState {
       isRevoked: isRevoked ?? this.isRevoked,
       isOtpReverifyRequired:
           isOtpReverifyRequired ?? this.isOtpReverifyRequired,
+      isMonthlyApprovalPending:
+          isMonthlyApprovalPending ?? this.isMonthlyApprovalPending,
+      monthlyRequestId: monthlyRequestId ?? this.monthlyRequestId,
       isLoading: isLoading ?? this.isLoading,
       reason: reason ?? this.reason,
       deviceId: deviceId ?? this.deviceId,
@@ -116,6 +125,8 @@ class DeviceAccessController extends Notifier<DeviceAccessState> {
         state = state.copyWith(
           isRevoked: false,
           isOtpReverifyRequired: false,
+          isMonthlyApprovalPending: false,
+          monthlyRequestId: null,
           reason: null,
           deviceId: identity.deviceId,
           requestStatus: 'none',
@@ -126,7 +137,36 @@ class DeviceAccessController extends Notifier<DeviceAccessState> {
         return;
       }
 
+      if (val.reason == 'monthly_approval_pending') {
+        state = state.copyWith(
+          isRevoked: false,
+          isOtpReverifyRequired: false,
+          isMonthlyApprovalPending: true,
+          reason: 'monthly_approval_pending',
+          deviceId: identity.deviceId,
+          message:
+              'Monthly security OTP verified. Awaiting administrator approval.',
+          lastCheckedAt: DateTime.now(),
+        );
+        return;
+      }
+
       if (val.reason == 'otp_reverification_required') {
+        final mStatus = await _repository.checkMonthlyStatus(deviceId: identity.deviceId);
+        if (mStatus.isSuccess && mStatus.valueOrNull?.status == 'pending_approval') {
+          state = state.copyWith(
+            isRevoked: false,
+            isOtpReverifyRequired: false,
+            isMonthlyApprovalPending: true,
+            monthlyRequestId: mStatus.valueOrNull?.requestId,
+            reason: 'monthly_approval_pending',
+            deviceId: identity.deviceId,
+            message:
+                'Monthly security OTP verified. Awaiting administrator approval.',
+            lastCheckedAt: DateTime.now(),
+          );
+          return;
+        }
         state = state.copyWith(
           isRevoked: false,
           isOtpReverifyRequired: true,
@@ -292,7 +332,70 @@ class DeviceAccessController extends Notifier<DeviceAccessState> {
   }
 
   /// Directly mark access revoked (e.g. from link launcher rejection).
+  void setMonthlyApprovalPending(String requestId) {
+    state = state.copyWith(
+      isOtpReverifyRequired: false,
+      isMonthlyApprovalPending: true,
+      monthlyRequestId: requestId,
+      reason: 'monthly_approval_pending',
+      message: 'Approval request submitted. Waiting for administrator approval.',
+    );
+  }
+
+  Future<bool> pollMonthlyApproval() async {
+    state = state.copyWith(isLoading: true);
+    final devId = state.deviceId.isNotEmpty
+        ? state.deviceId
+        : await _identityService.getDeviceId();
+
+    final statusRes = await _repository.checkMonthlyStatus(deviceId: devId);
+    state = state.copyWith(isLoading: false);
+
+    if (statusRes.isSuccess) {
+      final data = statusRes.valueOrNull!;
+      if (data.status == 'approved' || !data.isReverifyRequired) {
+        await checkStatus();
+        state = state.copyWith(
+          isOtpReverifyRequired: false,
+          isMonthlyApprovalPending: false,
+          reason: null,
+          message: 'Monthly verification approved! Portal access is restored.',
+        );
+        return true;
+      } else if (data.status == 'rejected') {
+        state = state.copyWith(
+          isMonthlyApprovalPending: false,
+          isOtpReverifyRequired: true,
+          message:
+              'Monthly verification rejected: ${data.rejectionReason ?? "Please contact administrator."}',
+        );
+        return false;
+      } else if (data.status == 'pending_approval') {
+        state = state.copyWith(
+          isMonthlyApprovalPending: true,
+          isOtpReverifyRequired: false,
+          message:
+              'Still pending administrator approval. Please check again shortly.',
+        );
+        return false;
+      }
+    }
+    return false;
+  }
+
   void markRevoked({required String reason, required String deviceId}) {
+    if (reason == 'monthly_approval_pending') {
+      state = state.copyWith(
+        isRevoked: false,
+        isOtpReverifyRequired: false,
+        isMonthlyApprovalPending: true,
+        reason: reason,
+        deviceId: deviceId,
+        message:
+            'Monthly security verification is pending administrator approval.',
+      );
+      return;
+    }
     if (reason == 'otp_reverification_required') {
       state = state.copyWith(
         isRevoked: false,

@@ -226,7 +226,7 @@ class _PortalCategoryListViewState extends ConsumerState<PortalCategoryListView>
             for (final item in items)
               SizedBox(
                 width: itemWidth,
-                height: 156,
+                height: 184,
                 child: PortalCardTile(
                   name: item.link.name,
                   icon: item.link.icon,
@@ -773,135 +773,141 @@ class _PortalCardTileState extends State<PortalCardTile> {
             hoverColor: Colors.transparent,
             splashColor: widget.color.withValues(alpha: 0.08),
             highlightColor: widget.color.withValues(alpha: 0.04),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
+            child: Stack(
               children: [
-                // Top brand accent stripe
-                AnimatedContainer(
-                  duration: const Duration(milliseconds: 180),
-                  height: _isHovered ? 5 : 4,
-                  decoration: BoxDecoration(
-                    color: widget.color,
-                    gradient: LinearGradient(
-                      colors: [
-                        widget.color,
-                        widget.color.withValues(alpha: 0.85),
-                      ],
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    // Top brand accent stripe
+                    AnimatedContainer(
+                      duration: const Duration(milliseconds: 180),
+                      height: _isHovered ? 5 : 4,
+                      decoration: BoxDecoration(
+                        color: widget.color,
+                        gradient: LinearGradient(
+                          colors: [
+                            widget.color,
+                            widget.color.withValues(alpha: 0.85),
+                          ],
+                        ),
+                      ),
                     ),
-                  ),
-                ),
 
-                Expanded(
-                  child: Padding(
-                    padding: const EdgeInsets.all(AppSpacing.md + 2),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        // Top row: 48x48 Uniform rounded logo tile + Star Pin Button
-                        Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    Expanded(
+                      child: Padding(
+                        padding: const EdgeInsets.fromLTRB(14, 12, 14, 12),
+                        child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            // 48x48 Uniform logo container for both real logos and placeholder icons
-                            AnimatedContainer(
-                              duration: const Duration(milliseconds: 180),
-                              width: 48,
-                              height: 48,
-                              clipBehavior: Clip.antiAlias,
-                              decoration: BoxDecoration(
-                                color: widget.color.withValues(
-                                  alpha: isDark
-                                      ? (_isHovered ? 0.24 : 0.14)
-                                      : (_isHovered ? 0.16 : 0.08),
-                                ),
-                                borderRadius: BorderRadius.circular(12),
-                                border: Border.all(
+                            // Card inner space dedicated to crisp, expansive logo presentation
+                            Expanded(
+                              child: AnimatedContainer(
+                                duration: const Duration(milliseconds: 180),
+                                width: double.infinity,
+                                clipBehavior: Clip.antiAlias,
+                                decoration: BoxDecoration(
                                   color: widget.color.withValues(
-                                    alpha: _isHovered ? 0.45 : 0.22,
+                                    alpha: isDark
+                                        ? (_isHovered ? 0.22 : 0.12)
+                                        : (_isHovered ? 0.14 : 0.06),
                                   ),
-                                  width: 1.2,
+                                  borderRadius: BorderRadius.circular(10),
+                                  border: Border.all(
+                                    color: widget.color.withValues(
+                                      alpha: _isHovered ? 0.50 : 0.22,
+                                    ),
+                                    width: 1.2,
+                                  ),
                                 ),
-                              ),
-                              child: Center(
-                                child: widget.imageUrl != null && widget.imageUrl!.isNotEmpty
-                                    ? Padding(
-                                        padding: const EdgeInsets.all(6.0),
-                                        child: Image.network(
-                                          widget.imageUrl!,
-                                          fit: BoxFit.contain,
-                                          width: 36,
-                                          height: 36,
-                                          errorBuilder: (context, error, stackTrace) =>
-                                              Icon(widget.icon, color: widget.color, size: 24),
-                                          loadingBuilder: (context, child, progress) {
-                                            if (progress == null) return child;
-                                            return Center(
-                                              child: SizedBox(
-                                                width: 16,
-                                                height: 16,
-                                                child: CircularProgressIndicator(
-                                                  strokeWidth: 2,
-                                                  color: widget.color,
+                                child: Center(
+                                  child: widget.imageUrl != null && widget.imageUrl!.isNotEmpty
+                                      ? Padding(
+                                          padding: const EdgeInsets.symmetric(
+                                            horizontal: 14.0,
+                                            vertical: 8.0,
+                                          ),
+                                          child: Image.network(
+                                            widget.imageUrl!,
+                                            fit: BoxFit.contain,
+                                            errorBuilder: (context, error, stackTrace) =>
+                                                Icon(widget.icon, color: widget.color, size: 38),
+                                            loadingBuilder: (context, child, progress) {
+                                              if (progress == null) return child;
+                                              return Center(
+                                                child: SizedBox(
+                                                  width: 20,
+                                                  height: 20,
+                                                  child: CircularProgressIndicator(
+                                                    strokeWidth: 2,
+                                                    color: widget.color,
+                                                  ),
                                                 ),
-                                              ),
-                                            );
-                                          },
-                                        ),
-                                      )
-                                    : Icon(widget.icon, color: widget.color, size: 24),
+                                              );
+                                            },
+                                          ),
+                                        )
+                                      : Icon(widget.icon, color: widget.color, size: 38),
+                                ),
                               ),
                             ),
 
-                            // Star Pin button
-                            if (widget.onTogglePin != null)
-                              AnimatedOpacity(
-                                opacity: (widget.isPinned || _isHovered || _isFocused) ? 1.0 : 0.0,
-                                duration: const Duration(milliseconds: 150),
-                                child: Material(
-                                  color: Colors.transparent,
-                                  child: Tooltip(
-                                    message: widget.isPinned ? 'Unpin from favorites' : 'Pin to favorites',
-                                    child: InkWell(
-                                      onTap: widget.onTogglePin,
-                                      borderRadius: BorderRadius.circular(999),
-                                      hoverColor: AppColors.signalAmber.withValues(alpha: 0.15),
-                                      child: Padding(
-                                        padding: const EdgeInsets.all(4.0),
-                                        child: Icon(
-                                          widget.isPinned
-                                              ? Icons.star_rounded
-                                              : Icons.star_outline_rounded,
-                                          size: 20,
-                                          color: widget.isPinned
-                                              ? AppColors.signalAmber
-                                              : secondaryInk,
-                                        ),
-                                      ),
-                                    ),
-                                  ),
-                                ),
+                            const SizedBox(height: 10),
+
+                            // Portal Name at bottom
+                            Text(
+                              widget.name,
+                              maxLines: 2,
+                              overflow: TextOverflow.ellipsis,
+                              style: TextStyle(
+                                fontSize: 13.5,
+                                fontWeight: FontWeight.w600,
+                                color: _isHovered ? widget.color : primaryInk,
+                                height: 1.25,
                               ),
+                            ),
                           ],
                         ),
+                      ),
+                    ),
+                  ],
+                ),
 
-                        const Spacer(),
-
-                        // Portal Name
-                        Text(
-                          widget.name,
-                          maxLines: 2,
-                          overflow: TextOverflow.ellipsis,
-                          style: TextStyle(
-                            fontSize: 14,
-                            fontWeight: FontWeight.w600,
-                            color: _isHovered ? widget.color : primaryInk,
-                            height: 1.25,
+                // Star Pin button floating cleanly in the top-right corner
+                if (widget.onTogglePin != null)
+                  Positioned(
+                    top: 10,
+                    right: 10,
+                    child: AnimatedOpacity(
+                      opacity: (widget.isPinned || _isHovered || _isFocused) ? 1.0 : 0.0,
+                      duration: const Duration(milliseconds: 150),
+                      child: Material(
+                        color: surfacePanel.withValues(alpha: 0.88),
+                        shape: const CircleBorder(),
+                        elevation: _isHovered ? 2 : 0,
+                        shadowColor: Colors.black26,
+                        child: Tooltip(
+                          message: widget.isPinned ? 'Unpin from favorites' : 'Pin to favorites',
+                          child: InkWell(
+                            onTap: widget.onTogglePin,
+                            borderRadius: BorderRadius.circular(999),
+                            hoverColor: AppColors.signalAmber.withValues(alpha: 0.15),
+                            child: Padding(
+                              padding: const EdgeInsets.all(5.0),
+                              child: Icon(
+                                widget.isPinned
+                                    ? Icons.star_rounded
+                                    : Icons.star_outline_rounded,
+                                size: 18,
+                                color: widget.isPinned
+                                    ? AppColors.signalAmber
+                                    : secondaryInk,
+                              ),
+                            ),
                           ),
                         ),
-                      ],
+                      ),
                     ),
                   ),
-                ),
               ],
             ),
           ),

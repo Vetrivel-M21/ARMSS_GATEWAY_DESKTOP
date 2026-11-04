@@ -14,31 +14,40 @@ class DeviceRevocationBanner extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final access = ref.watch(deviceAccessControllerProvider);
 
-    final showBanner = (access.isRevoked || access.isOtpReverifyRequired) &&
+    final isMonthlyPending = access.isMonthlyApprovalPending ||
+        access.reason == 'monthly_approval_pending';
+    final isOtpReverify = !isMonthlyPending &&
+        (access.isOtpReverifyRequired ||
+            access.reason == 'otp_reverification_required');
+    final isPending =
+        !isMonthlyPending && !isOtpReverify && access.requestStatus == 'pending';
+    final isRejected =
+        !isMonthlyPending && !isOtpReverify && access.requestStatus == 'rejected';
+
+    final showBanner = (access.isRevoked ||
+            access.isOtpReverifyRequired ||
+            isMonthlyPending) &&
         access.lastCheckedAt != null;
     if (!showBanner) {
       return const SizedBox.shrink();
     }
 
-    final isOtpReverify = access.isOtpReverifyRequired ||
-        access.reason == 'otp_reverification_required';
-    final isPending = !isOtpReverify && access.requestStatus == 'pending';
-    final isRejected = !isOtpReverify && access.requestStatus == 'rejected';
-
-    final Color borderColor = (isPending || isOtpReverify)
+    final Color borderColor = (isMonthlyPending || isPending || isOtpReverify)
         ? AppColors.signalAmber
         : AppColors.signalError;
-    final Color bgColor = (isPending || isOtpReverify)
+    final Color bgColor = (isMonthlyPending || isPending || isOtpReverify)
         ? AppColors.signalAmber.withValues(alpha: 0.08)
         : AppColors.signalError.withValues(alpha: 0.08);
-    final IconData icon = isOtpReverify
-        ? Icons.verified_user_outlined
-        : isPending
-            ? Icons.hourglass_top_rounded
+    final IconData icon = (isMonthlyPending || isPending)
+        ? Icons.hourglass_top_rounded
+        : isOtpReverify
+            ? Icons.verified_user_outlined
             : Icons.gpp_bad_outlined;
 
     String title;
-    if (isOtpReverify) {
+    if (isMonthlyPending) {
+      title = 'Monthly Security Verification — Pending Admin Approval';
+    } else if (isOtpReverify) {
       title = 'Monthly Security Verification Required';
     } else if (isPending) {
       title = 'Activation Request Pending Administrator Approval';
@@ -49,7 +58,10 @@ class DeviceRevocationBanner extends ConsumerWidget {
     }
 
     String details;
-    if (isOtpReverify) {
+    if (isMonthlyPending) {
+      details =
+          'Your monthly security OTP has been verified. Waiting for administrator approval to unlock company web portals.';
+    } else if (isOtpReverify) {
       details =
           'Routine 30-day security check is due. Please verify via email OTP to continue accessing portals.';
     } else if (isPending) {
@@ -101,7 +113,7 @@ class DeviceRevocationBanner extends ConsumerWidget {
                   style: TextStyle(
                     fontSize: 13,
                     fontWeight: FontWeight.w700,
-                    color: (isPending || isOtpReverify)
+                    color: (isMonthlyPending || isPending || isOtpReverify)
                         ? const Color(0xFF92400E)
                         : const Color(0xFF991B1B),
                   ),
@@ -111,7 +123,7 @@ class DeviceRevocationBanner extends ConsumerWidget {
                   details,
                   style: TextStyle(
                     fontSize: 12,
-                    color: (isPending || isOtpReverify)
+                    color: (isMonthlyPending || isPending || isOtpReverify)
                         ? const Color(0xFFB45309)
                         : const Color(0xFFB91C1C),
                   ),
@@ -127,6 +139,43 @@ class DeviceRevocationBanner extends ConsumerWidget {
               width: 24,
               height: 24,
               child: CircularProgressIndicator(strokeWidth: 2),
+            )
+          else if (isMonthlyPending)
+            OutlinedButton.icon(
+              style: OutlinedButton.styleFrom(
+                foregroundColor: const Color(0xFFD97706),
+                side: const BorderSide(color: Color(0xFFD97706), width: 1.5),
+                backgroundColor: Colors.white,
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 14,
+                  vertical: 8,
+                ),
+                textStyle: const TextStyle(
+                  fontSize: 12,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+              icon: const Icon(Icons.sync, size: 16),
+              label: const Text('Check Status'),
+              onPressed: () async {
+                final approved = await ref
+                    .read(deviceAccessControllerProvider.notifier)
+                    .pollMonthlyApproval();
+                if (context.mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: Text(
+                        approved
+                            ? 'Admin approved! Web portals are now accessible.'
+                            : 'Still pending administrator approval. Please check again shortly.',
+                      ),
+                      backgroundColor: approved
+                          ? AppColors.signalSuccess
+                          : AppColors.signalAmber,
+                    ),
+                  );
+                }
+              },
             )
           else if (isOtpReverify)
             FilledButton.icon(
@@ -202,4 +251,3 @@ class DeviceRevocationBanner extends ConsumerWidget {
     );
   }
 }
-
