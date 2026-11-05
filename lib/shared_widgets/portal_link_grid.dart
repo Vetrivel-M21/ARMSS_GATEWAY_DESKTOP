@@ -679,6 +679,267 @@ class _PortalViewModeButton extends StatelessWidget {
   }
 }
 
+/// Displays an expansive full-dialog zoom view for any portal logo, allowing
+/// interactive scroll-wheel zooming, panning, and a direct "Open in Browser" button.
+void showPortalLogoDialog({
+  required BuildContext context,
+  required String name,
+  required IconData icon,
+  required Color color,
+  required VoidCallback onOpenInBrowser,
+  String? imageUrl,
+  String? categoryLabel,
+}) {
+  showDialog(
+    context: context,
+    barrierDismissible: true,
+    builder: (dialogCtx) {
+      final isDark = Theme.of(dialogCtx).brightness == Brightness.dark;
+      final surface = isDark ? AppColors.darkSurfacePanel : Colors.white;
+      final primaryInk = isDark ? AppColors.darkInkPrimary : AppColors.inkPrimary;
+      final secondaryInk = isDark ? AppColors.darkInkSecondary : AppColors.inkSecondary;
+      final lineBorder = isDark ? AppColors.darkLineHairline : AppColors.lineHairline;
+      final TransformationController transformController = TransformationController();
+
+      return Dialog(
+        backgroundColor: Colors.transparent,
+        insetPadding: const EdgeInsets.symmetric(horizontal: 40, vertical: 30),
+        child: Center(
+          child: Container(
+            constraints: const BoxConstraints(maxWidth: 780, maxHeight: 620),
+            decoration: BoxDecoration(
+              color: surface,
+              borderRadius: BorderRadius.circular(18),
+              border: Border.all(color: lineBorder.withValues(alpha: 0.8)),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withValues(alpha: isDark ? 0.6 : 0.25),
+                  blurRadius: 32,
+                  offset: const Offset(0, 16),
+                ),
+              ],
+            ),
+            clipBehavior: Clip.antiAlias,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                // Top brand accent stripe
+                Container(
+                  height: 4,
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      colors: [color, color.withValues(alpha: 0.7)],
+                    ),
+                  ),
+                ),
+
+                // Dialog Header
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(22, 16, 16, 14),
+                  child: Row(
+                    children: [
+                      Container(
+                        width: 36,
+                        height: 36,
+                        decoration: BoxDecoration(
+                          color: color.withValues(alpha: 0.12),
+                          borderRadius: BorderRadius.circular(8),
+                          border: Border.all(color: color.withValues(alpha: 0.3)),
+                        ),
+                        child: Icon(icon, color: color, size: 20),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              name,
+                              style: TextStyle(
+                                fontSize: 17,
+                                fontWeight: FontWeight.w700,
+                                color: primaryInk,
+                              ),
+                            ),
+                            if (categoryLabel != null && categoryLabel.isNotEmpty)
+                              Padding(
+                                padding: const EdgeInsets.only(top: 2.0),
+                                child: Text(
+                                  categoryLabel,
+                                  style: TextStyle(
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.w500,
+                                    color: secondaryInk,
+                                  ),
+                                ),
+                              ),
+                          ],
+                        ),
+                      ),
+                      Tooltip(
+                        message: 'Minimize / Close (Esc)',
+                        child: IconButton(
+                          icon: const Icon(Icons.close_rounded),
+                          color: secondaryInk,
+                          hoverColor: isDark ? Colors.white10 : Colors.black12,
+                          onPressed: () => Navigator.of(dialogCtx).pop(),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                Divider(height: 1, color: lineBorder.withValues(alpha: 0.6)),
+
+                // Interactive Zoom Canvas
+                Expanded(
+                  child: Stack(
+                    children: [
+                      Container(
+                        color: isDark ? const Color(0xFF0F172A) : const Color(0xFFF8FAFC),
+                        width: double.infinity,
+                        height: double.infinity,
+                        child: InteractiveViewer(
+                          transformationController: transformController,
+                          minScale: 0.5,
+                          maxScale: 6.0,
+                          boundaryMargin: const EdgeInsets.all(60),
+                          child: Center(
+                            child: imageUrl != null && imageUrl.isNotEmpty
+                                ? Padding(
+                                    padding: const EdgeInsets.all(28.0),
+                                    child: Image.network(
+                                      imageUrl,
+                                      fit: BoxFit.contain,
+                                      errorBuilder: (context, error, stackTrace) =>
+                                          Icon(icon, color: color, size: 100),
+                                      loadingBuilder: (context, child, progress) {
+                                        if (progress == null) return child;
+                                        return Center(
+                                          child: SizedBox(
+                                            width: 32,
+                                            height: 32,
+                                            child: CircularProgressIndicator(
+                                              strokeWidth: 2.5,
+                                              color: color,
+                                            ),
+                                          ),
+                                        );
+                                      },
+                                    ),
+                                  )
+                                : Icon(icon, color: color, size: 100),
+                          ),
+                        ),
+                      ),
+
+                      // Tooltip hint on bottom-left
+                      Positioned(
+                        bottom: 12,
+                        left: 16,
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                          decoration: BoxDecoration(
+                            color: surface.withValues(alpha: 0.88),
+                            borderRadius: BorderRadius.circular(6),
+                            border: Border.all(color: lineBorder.withValues(alpha: 0.5)),
+                          ),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Icon(Icons.pinch_rounded, size: 13, color: secondaryInk),
+                              const SizedBox(width: 5),
+                              Text(
+                                'Scroll wheel to zoom, drag to pan',
+                                style: TextStyle(fontSize: 11, color: secondaryInk),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+
+                      // Reset zoom button on bottom-right
+                      Positioned(
+                        bottom: 10,
+                        right: 16,
+                        child: Tooltip(
+                          message: 'Reset zoom level',
+                          child: Material(
+                            color: surface.withValues(alpha: 0.9),
+                            borderRadius: BorderRadius.circular(6),
+                            elevation: 1,
+                            child: InkWell(
+                              onTap: () => transformController.value = Matrix4.identity(),
+                              borderRadius: BorderRadius.circular(6),
+                              child: Padding(
+                                padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 5),
+                                child: Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    Icon(Icons.restart_alt_rounded, size: 14, color: secondaryInk),
+                                    const SizedBox(width: 4),
+                                    Text(
+                                      'Reset',
+                                      style: TextStyle(
+                                        fontSize: 11.5,
+                                        fontWeight: FontWeight.w600,
+                                        color: secondaryInk,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                Divider(height: 1, color: lineBorder.withValues(alpha: 0.6)),
+
+                // Footer Actions
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.end,
+                    children: [
+                      TextButton(
+                        onPressed: () => Navigator.of(dialogCtx).pop(),
+                        style: TextButton.styleFrom(
+                          foregroundColor: secondaryInk,
+                          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                        ),
+                        child: const Text('Close'),
+                      ),
+                      const SizedBox(width: 10),
+                      FilledButton.icon(
+                        onPressed: () {
+                          Navigator.of(dialogCtx).pop();
+                          onOpenInBrowser();
+                        },
+                        icon: const Icon(Icons.open_in_browser_rounded, size: 17),
+                        label: const Text('Open in Browser'),
+                        style: FilledButton.styleFrom(
+                          backgroundColor: color,
+                          foregroundColor: Colors.white,
+                          padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 11),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      );
+    },
+  );
+}
+
 class PortalCardTile extends StatefulWidget {
   final String name;
   final IconData icon;
@@ -710,6 +971,18 @@ class PortalCardTile extends StatefulWidget {
 class _PortalCardTileState extends State<PortalCardTile> {
   bool _isHovered = false;
   bool _isFocused = false;
+
+  void _openZoom() {
+    showPortalLogoDialog(
+      context: context,
+      name: widget.name,
+      icon: widget.icon,
+      color: widget.color,
+      onOpenInBrowser: widget.onTap,
+      imageUrl: widget.imageUrl,
+      categoryLabel: widget.categoryLabel,
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -799,54 +1072,101 @@ class _PortalCardTileState extends State<PortalCardTile> {
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            // Card inner space dedicated to crisp, expansive logo presentation
+                            // Card inner space dedicated to crisp, expansive logo presentation with interactive zoom
                             Expanded(
-                              child: AnimatedContainer(
-                                duration: const Duration(milliseconds: 180),
-                                width: double.infinity,
-                                clipBehavior: Clip.antiAlias,
-                                decoration: BoxDecoration(
-                                  color: widget.color.withValues(
-                                    alpha: isDark
-                                        ? (_isHovered ? 0.22 : 0.12)
-                                        : (_isHovered ? 0.14 : 0.06),
-                                  ),
-                                  borderRadius: BorderRadius.circular(10),
-                                  border: Border.all(
-                                    color: widget.color.withValues(
-                                      alpha: _isHovered ? 0.50 : 0.22,
+                              child: MouseRegion(
+                                cursor: SystemMouseCursors.zoomIn,
+                                child: GestureDetector(
+                                  behavior: HitTestBehavior.opaque,
+                                  onTap: _openZoom,
+                                  child: AnimatedContainer(
+                                    duration: const Duration(milliseconds: 180),
+                                    width: double.infinity,
+                                    clipBehavior: Clip.antiAlias,
+                                    decoration: BoxDecoration(
+                                      color: widget.color.withValues(
+                                        alpha: isDark
+                                            ? (_isHovered ? 0.22 : 0.12)
+                                            : (_isHovered ? 0.14 : 0.06),
+                                      ),
+                                      borderRadius: BorderRadius.circular(10),
+                                      border: Border.all(
+                                        color: widget.color.withValues(
+                                          alpha: _isHovered ? 0.50 : 0.22,
+                                        ),
+                                        width: 1.2,
+                                      ),
                                     ),
-                                    width: 1.2,
-                                  ),
-                                ),
-                                child: Center(
-                                  child: widget.imageUrl != null && widget.imageUrl!.isNotEmpty
-                                      ? Padding(
-                                          padding: const EdgeInsets.symmetric(
-                                            horizontal: 14.0,
-                                            vertical: 8.0,
-                                          ),
-                                          child: Image.network(
-                                            widget.imageUrl!,
-                                            fit: BoxFit.contain,
-                                            errorBuilder: (context, error, stackTrace) =>
-                                                Icon(widget.icon, color: widget.color, size: 38),
-                                            loadingBuilder: (context, child, progress) {
-                                              if (progress == null) return child;
-                                              return Center(
-                                                child: SizedBox(
-                                                  width: 20,
-                                                  height: 20,
-                                                  child: CircularProgressIndicator(
-                                                    strokeWidth: 2,
-                                                    color: widget.color,
+                                    child: Stack(
+                                      children: [
+                                        Center(
+                                          child: widget.imageUrl != null && widget.imageUrl!.isNotEmpty
+                                              ? Padding(
+                                                  padding: const EdgeInsets.symmetric(
+                                                    horizontal: 14.0,
+                                                    vertical: 8.0,
                                                   ),
+                                                  child: Image.network(
+                                                    widget.imageUrl!,
+                                                    fit: BoxFit.contain,
+                                                    errorBuilder: (context, error, stackTrace) =>
+                                                        Icon(widget.icon, color: widget.color, size: 38),
+                                                    loadingBuilder: (context, child, progress) {
+                                                      if (progress == null) return child;
+                                                      return Center(
+                                                        child: SizedBox(
+                                                          width: 20,
+                                                          height: 20,
+                                                          child: CircularProgressIndicator(
+                                                            strokeWidth: 2,
+                                                            color: widget.color,
+                                                          ),
+                                                        ),
+                                                      );
+                                                    },
+                                                  ),
+                                                )
+                                              : Icon(widget.icon, color: widget.color, size: 38),
+                                        ),
+
+                                        // Hover zoom hint icon pill at top-left of the logo tile
+                                        Positioned(
+                                          top: 6,
+                                          left: 6,
+                                          child: AnimatedOpacity(
+                                            opacity: _isHovered ? 1.0 : 0.0,
+                                            duration: const Duration(milliseconds: 150),
+                                            child: Tooltip(
+                                              message: 'Click to zoom logo',
+                                              child: Container(
+                                                padding: const EdgeInsets.all(4.0),
+                                                decoration: BoxDecoration(
+                                                  color: surfacePanel.withValues(alpha: 0.92),
+                                                  borderRadius: BorderRadius.circular(6),
+                                                  border: Border.all(
+                                                    color: widget.color.withValues(alpha: 0.35),
+                                                    width: 1,
+                                                  ),
+                                                  boxShadow: [
+                                                    BoxShadow(
+                                                      color: Colors.black.withValues(alpha: 0.12),
+                                                      blurRadius: 4,
+                                                      offset: const Offset(0, 1),
+                                                    ),
+                                                  ],
                                                 ),
-                                              );
-                                            },
+                                                child: Icon(
+                                                  Icons.zoom_in_rounded,
+                                                  size: 14,
+                                                  color: widget.color,
+                                                ),
+                                              ),
+                                            ),
                                           ),
-                                        )
-                                      : Icon(widget.icon, color: widget.color, size: 38),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
                                 ),
                               ),
                             ),
@@ -870,6 +1190,38 @@ class _PortalCardTileState extends State<PortalCardTile> {
                       ),
                     ),
                   ],
+                ),
+
+                // Expand / Zoom button floating in top-left corner
+                Positioned(
+                  top: 10,
+                  left: 10,
+                  child: AnimatedOpacity(
+                    opacity: (_isHovered || _isFocused) ? 1.0 : 0.0,
+                    duration: const Duration(milliseconds: 150),
+                    child: Material(
+                      color: surfacePanel.withValues(alpha: 0.90),
+                      shape: const CircleBorder(),
+                      elevation: _isHovered ? 2 : 0,
+                      shadowColor: Colors.black26,
+                      child: Tooltip(
+                        message: 'Expand & zoom logo',
+                        child: InkWell(
+                          onTap: _openZoom,
+                          borderRadius: BorderRadius.circular(999),
+                          hoverColor: widget.color.withValues(alpha: 0.15),
+                          child: Padding(
+                            padding: const EdgeInsets.all(5.0),
+                            child: Icon(
+                              Icons.open_in_full_rounded,
+                              size: 15,
+                              color: secondaryInk,
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
                 ),
 
                 // Star Pin button floating cleanly in the top-right corner
@@ -1037,40 +1389,60 @@ class _PortalListTileState extends State<PortalListTile> {
                 ),
                 const SizedBox(width: 14),
 
-                // Icon / image badge (42x42 uniform rounded logo tile)
-                AnimatedContainer(
-                  duration: const Duration(milliseconds: 150),
-                  width: 42,
-                  height: 42,
-                  clipBehavior: Clip.antiAlias,
-                  decoration: BoxDecoration(
-                    color: widget.color.withValues(
-                      alpha: isDark
-                          ? (_isHovered ? 0.24 : 0.14)
-                          : (_isHovered ? 0.16 : 0.08),
-                    ),
-                    borderRadius: BorderRadius.circular(10),
-                    border: Border.all(
-                      color: widget.color.withValues(
-                        alpha: _isHovered ? 0.42 : 0.20,
-                      ),
-                      width: 1.0,
-                    ),
-                  ),
-                  child: Center(
-                    child: widget.imageUrl != null && widget.imageUrl!.isNotEmpty
-                        ? Padding(
-                            padding: const EdgeInsets.all(5.0),
-                            child: Image.network(
-                              widget.imageUrl!,
-                              fit: BoxFit.contain,
-                              width: 32,
-                              height: 32,
-                              errorBuilder: (context, error, stackTrace) =>
-                                  Icon(widget.icon, color: widget.color, size: 22),
+                // Icon / image badge (42x42 uniform rounded logo tile with zoom on click)
+                Tooltip(
+                  message: 'Click to zoom logo',
+                  child: MouseRegion(
+                    cursor: SystemMouseCursors.zoomIn,
+                    child: GestureDetector(
+                      behavior: HitTestBehavior.opaque,
+                      onTap: () {
+                        showPortalLogoDialog(
+                          context: context,
+                          name: widget.name,
+                          icon: widget.icon,
+                          color: widget.color,
+                          onOpenInBrowser: widget.onTap,
+                          imageUrl: widget.imageUrl,
+                          categoryLabel: widget.tabName,
+                        );
+                      },
+                      child: AnimatedContainer(
+                        duration: const Duration(milliseconds: 150),
+                        width: 42,
+                        height: 42,
+                        clipBehavior: Clip.antiAlias,
+                        decoration: BoxDecoration(
+                          color: widget.color.withValues(
+                            alpha: isDark
+                                ? (_isHovered ? 0.24 : 0.14)
+                                : (_isHovered ? 0.16 : 0.08),
+                          ),
+                          borderRadius: BorderRadius.circular(10),
+                          border: Border.all(
+                            color: widget.color.withValues(
+                              alpha: _isHovered ? 0.42 : 0.20,
                             ),
-                          )
-                        : Icon(widget.icon, color: widget.color, size: 22),
+                            width: 1.0,
+                          ),
+                        ),
+                        child: Center(
+                          child: widget.imageUrl != null && widget.imageUrl!.isNotEmpty
+                              ? Padding(
+                                  padding: const EdgeInsets.all(5.0),
+                                  child: Image.network(
+                                    widget.imageUrl!,
+                                    fit: BoxFit.contain,
+                                    width: 32,
+                                    height: 32,
+                                    errorBuilder: (context, error, stackTrace) =>
+                                        Icon(widget.icon, color: widget.color, size: 22),
+                                  ),
+                                )
+                              : Icon(widget.icon, color: widget.color, size: 22),
+                        ),
+                      ),
+                    ),
                   ),
                 ),
                 const SizedBox(width: 14),

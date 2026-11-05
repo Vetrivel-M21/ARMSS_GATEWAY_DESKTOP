@@ -17,6 +17,16 @@ runtime is already installed and installs it silently when needed.
 
 This produces `windows\installer\Output\ARMSS_Gateway_Setup.exe`.
 
+### SHA-256 Checksum Verification
+To verify the integrity of the installer build:
+
+```powershell
+Get-FileHash -Path "windows\installer\Output\ARMSS_Gateway_Setup.exe" -Algorithm SHA256
+```
+
+- **Current v1.1.16 SHA-256:** `1A6055323724D2FD4131D14D349FF101C93E6E91F4652F0C7AD2380BA1F136BE`
+- A corresponding checksum file is saved at `windows\installer\Output\ARMSS_Gateway_Setup.exe.sha256`.
+
 ## What the installer does
 
 - Installs per-user to `%LocalAppData%\Programs\ARMSS Gateway` — no admin/UAC prompt required.
