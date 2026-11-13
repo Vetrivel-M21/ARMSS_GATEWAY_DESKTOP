@@ -203,12 +203,15 @@ class _MonthlyOtpVerificationScreenState
       // Status filter
       if (_selectedStatus != 'all') {
         if (_selectedStatus == 'pending_approval') {
-          if (r.status != 'pending_approval' && r.status != 'pending_otp') {
+          if (r.status != 'pending_approval' || !r.otpVerified) {
             return false;
           }
         } else if (r.status != _selectedStatus) {
           return false;
         }
+      } else {
+        // When 'all' is selected, exclude unverified in-flight OTP attempts
+        if (r.status == 'pending_otp') return false;
       }
 
       // Search query
@@ -233,7 +236,7 @@ class _MonthlyOtpVerificationScreenState
     final filtered = _filteredRequests();
     final allRequests = _requests ?? [];
     final pendingCount = allRequests
-        .where((r) => r.status == 'pending_approval' || r.status == 'pending_otp')
+        .where((r) => r.status == 'pending_approval' && r.otpVerified)
         .length;
     final approvedCount =
         allRequests.where((r) => r.status == 'approved').length;
@@ -347,7 +350,7 @@ class _MonthlyOtpVerificationScreenState
                 const SizedBox(width: AppSpacing.md),
                 _buildStatCard(
                   title: 'Total Requests',
-                  count: allRequests.length,
+                  count: allRequests.where((r) => r.status != 'pending_otp').length,
                   color: AppColors.accentLedger,
                   icon: Icons.list_alt_rounded,
                   isSelected: _selectedStatus == 'all',
@@ -553,8 +556,7 @@ class _MonthlyOtpVerificationScreenState
   }
 
   Widget _buildRequestRow(AdminMonthlyRequest req) {
-    final isPending =
-        req.status == 'pending_approval' || req.status == 'pending_otp';
+    final isPending = req.status == 'pending_approval' && req.otpVerified;
     final isApproved = req.status == 'approved';
     final isRejected = req.status == 'rejected';
 
@@ -562,13 +564,17 @@ class _MonthlyOtpVerificationScreenState
         ? AppColors.signalSuccess
         : isPending
             ? AppColors.signalAmber
-            : AppColors.signalError;
+            : isRejected
+                ? AppColors.signalError
+                : AppColors.inkMuted;
 
     final String statusLabel = isApproved
         ? 'Approved'
         : isPending
             ? 'Pending Approval'
-            : 'Rejected';
+            : isRejected
+                ? 'Rejected'
+                : 'Pending OTP';
 
     final dateStr = DateFormat('dd MMM yyyy, hh:mm a').format(req.requestedAt);
 

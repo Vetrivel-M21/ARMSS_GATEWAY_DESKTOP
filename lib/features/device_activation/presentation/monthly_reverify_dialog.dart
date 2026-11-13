@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -25,8 +27,12 @@ class _MonthlyReverifyDialogState extends ConsumerState<MonthlyReverifyDialog> {
   String? _maskedEmail;
   String? _errorMessage;
 
+  Timer? _resendTimer;
+  int _resendCountdown = 0;
+
   // Flow stages:
-  // 1: OTP Entry
+  // 0: Prompt to Send (User must explicitly click "Send Verification Code")
+  // 1: OTP Entry (Code sent, user enters 6-digit code)
   // 2: Need Admin Approval (OTP verified, awaiting user click on 'Request Approve')
   // 3: Request Submitted (waiting for admin to approve)
   bool _isOtpVerified = false;
@@ -35,16 +41,37 @@ class _MonthlyReverifyDialogState extends ConsumerState<MonthlyReverifyDialog> {
   @override
   void initState() {
     super.initState();
-    _sendOtp();
+    // Do not auto-send OTP on mount to prevent accidental rate limit exhaustion.
+    // The user will explicitly click "Send Verification Code".
   }
 
   @override
   void dispose() {
+    _resendTimer?.cancel();
     _otpController.dispose();
     super.dispose();
   }
 
+  void _startResendTimer([int seconds = 60]) {
+    _resendTimer?.cancel();
+    setState(() => _resendCountdown = seconds);
+    _resendTimer = Timer.periodic(const Duration(seconds: 1), (timer) {
+      if (!mounted) {
+        timer.cancel();
+        return;
+      }
+      if (_resendCountdown <= 1) {
+        timer.cancel();
+        setState(() => _resendCountdown = 0);
+      } else {
+        setState(() => _resendCountdown--);
+      }
+    });
+  }
+
   Future<void> _sendOtp() async {
+    if (_resendCountdown > 0) return;
+
     setState(() {
       _isLoading = true;
       _errorMessage = null;
@@ -62,6 +89,7 @@ class _MonthlyReverifyDialogState extends ConsumerState<MonthlyReverifyDialog> {
         _requestId = res.requestId;
         _maskedEmail = res.sentTo;
       });
+      _startResendTimer(60);
     } else {
       setState(() {
         _errorMessage =
@@ -92,11 +120,12 @@ class _MonthlyReverifyDialogState extends ConsumerState<MonthlyReverifyDialog> {
     setState(() => _isLoading = false);
 
     if (result.isSuccess && result.valueOrNull == true) {
-      // OTP verified! Transition to "Need Admin Approval" stage
+      // OTP verified! Transition and automatically submit approval request to administrator
       setState(() {
         _isOtpVerified = true;
         _errorMessage = null;
       });
+      await _requestApproval();
     } else {
       setState(() {
         _errorMessage =
@@ -143,7 +172,117 @@ class _MonthlyReverifyDialogState extends ConsumerState<MonthlyReverifyDialog> {
     if (_isOtpVerified) {
       return _buildNeedAdminApprovalView();
     }
+    if (_requestId == null) {
+      return _buildPromptToSendView();
+    }
     return _buildOtpEntryView();
+  }
+
+  // ── Stage 0: Prompt before generating & dispatching email OTP ──────────────
+  Widget _buildPromptToSendView() {
+    return AlertDialog(
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+      title: Row(
+        children: [
+          Container(
+            padding: const EdgeInsets.all(8),
+            decoration: BoxDecoration(
+              color: AppColors.accentLedger.withValues(alpha: 0.12),
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: const Icon(
+              Icons.security_rounded,
+              color: AppColors.accentLedger,
+              size: 24,
+            ),
+          ),
+          const SizedBox(width: AppSpacing.md),
+          const Text(
+            'Security Verification',
+            style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18),
+          ),
+        ],
+      ),
+      content: SizedBox(
+        width: 440,
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text(
+              'Your workstation installation requires a routine 30-day security re-verification before accessing company web tools.',
+              style: TextStyle(fontSize: 13, color: AppColors.inkPrimary, height: 1.4),
+            ),
+            const SizedBox(height: AppSpacing.md),
+            Container(
+              padding: const EdgeInsets.all(AppSpacing.md),
+              decoration: BoxDecoration(
+                color: AppColors.surfaceSunken,
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(color: AppColors.lineHairline),
+              ),
+              child: const Row(
+                children: [
+                  Icon(
+                    Icons.mark_email_unread_outlined,
+                    size: 22,
+                    color: AppColors.accentLedger,
+                  ),
+                  SizedBox(width: 10),
+                  Expanded(
+                    child: Text(
+                      'Click "Send Verification Code" below when you are ready. A 6-digit one-time code will be dispatched to your registered email address.',
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: AppColors.inkPrimary,
+                        height: 1.4,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            if (_errorMessage != null) ...[
+              const SizedBox(height: AppSpacing.md),
+              Text(
+                _errorMessage!,
+                style: const TextStyle(
+                  fontSize: 12,
+                  color: AppColors.signalError,
+                ),
+              ),
+            ],
+            if (_isLoading) ...[
+              const SizedBox(height: AppSpacing.md),
+              const Center(child: CircularProgressIndicator()),
+            ],
+          ],
+        ),
+      ),
+      actionsPadding: const EdgeInsets.fromLTRB(
+        AppSpacing.lg,
+        0,
+        AppSpacing.lg,
+        AppSpacing.lg,
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.of(context).pop(false),
+          child: const Text('Cancel'),
+        ),
+        GradientFilledButton(
+          onPressed: _isLoading ? null : _sendOtp,
+          child: const Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(Icons.send_rounded, size: 16),
+              SizedBox(width: 6),
+              Text('Send Verification Code'),
+            ],
+          ),
+        ),
+      ],
+    );
   }
 
   // ── Stage 1: Enter OTP sent to user email ──────────────────────────────────
@@ -209,10 +348,19 @@ class _MonthlyReverifyDialogState extends ConsumerState<MonthlyReverifyDialog> {
                       ),
                     ),
                     TextButton(
-                      onPressed: _isLoading ? null : _sendOtp,
-                      child: const Text(
-                        'Resend',
-                        style: TextStyle(fontSize: 12),
+                      onPressed: (_isLoading || _resendCountdown > 0)
+                          ? null
+                          : _sendOtp,
+                      child: Text(
+                        _resendCountdown > 0
+                            ? 'Resend (${_resendCountdown}s)'
+                            : 'Resend',
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: _resendCountdown > 0
+                              ? AppColors.inkMuted
+                              : null,
+                        ),
                       ),
                     ),
                   ],

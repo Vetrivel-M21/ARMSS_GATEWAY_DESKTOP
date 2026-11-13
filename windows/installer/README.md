@@ -24,7 +24,7 @@ To verify the integrity of the installer build:
 Get-FileHash -Path "windows\installer\Output\ARMSS_Gateway_Setup.exe" -Algorithm SHA256
 ```
 
-- **Current v1.1.16 SHA-256:** `1A6055323724D2FD4131D14D349FF101C93E6E91F4652F0C7AD2380BA1F136BE`
+- **Current v1.1.18 SHA-256:** `16AC5265FA20656F8E57BB3EDEFF0F6908F539312FFACDC699030B0CEAD7C1A5`
 - A corresponding checksum file is saved at `windows\installer\Output\ARMSS_Gateway_Setup.exe.sha256`.
 
 ## What the installer does

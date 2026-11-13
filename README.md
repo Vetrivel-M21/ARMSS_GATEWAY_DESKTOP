@@ -79,9 +79,9 @@ To deliver this update automatically to installed desktop clients:
 
 ```env
 # Desktop auto-update metadata
-APP_UPDATE_VERSION=1.1.2
+APP_UPDATE_VERSION=1.1.18
 APP_UPDATE_URL=https://armssgateway.arminfo.in/api/v1/app/download
-APP_UPDATE_SHA256=<PASTE_THE_SHA256_HASH_HERE>
+APP_UPDATE_SHA256=16AC5265FA20656F8E57BB3EDEFF0F6908F539312FFACDC699030B0CEAD7C1A5
 APP_UPDATE_FILE=/opt/armss/ARMSS_Gateway_Setup.exe
 ```
 
